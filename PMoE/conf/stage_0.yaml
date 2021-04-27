@@ -1,0 +1,87 @@
+# Training parameters
+train_params:
+  epochs: 100
+  device: "cuda:1" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
+  optimizer: "adam"
+  save_every: 10
+  swa_start: 80 # start epoch of stochastic weight averaging
+  patience: 3 # how many epochs we want to wait after the last time the validation loss improved before breaking the training loop
+  early_stopping_delta: 0
+
+# Logger parameters
+logger:
+  project: "PMoE" # project name or workspace
+  tags: "segmentation unet stage_0 swa"
+  resume: False # (boolean) whether to resume training or not
+  experiment_key: None # can be retrieved from logger dashboard, available if only resuming
+  log_dir: "./logs" # where to store log data
+
+# Dataloader parameters
+dataloader:
+  num_workers: 30
+  batch_size: 128
+  shuffle: True # whether to shuffle data or not
+  pin_memory: True # directly load datasets as CUDA tensors
+
+# Train dataset parameters
+dataset:
+  root: "../data/train" # where data resides, relative to dataloader path
+  aug_type: "segmentation" # which type of augmentation to use
+  seed: 42 # random seed for choosing validation folders
+  crop:
+    - 125 # crop from the top (remove ski)
+    - 90  # crop from the bottom (remove hood)
+  resize:
+    - 224 # height
+    - 224 # width
+
+# Test dataset parameters
+val_dataset:
+  root: "../data/test" # where data resides, relative to dataloader path
+  aug_type: "segmentation" # which type of augmentation to use
+  seed: 42 # random seed for choosing validation folders
+  crop:
+    - 125 # crop from the top (remove ski)
+    - 90  # crop from the bottom (remove hood)
+  resize:
+    - 224 # height
+    - 224 # width
+
+# directories
+directory:
+  model_name: "unet"
+  save: "../checkpoint"
+  load: "../checkpoint/unet-best.pt"
+
+# model parameters
+model:
+  in_features: 3
+  out_features: 23 # number of segmentation classes, for carla 0.9.6+ it is 23
+  gamma: 2 # gamma parameter of eca module
+  b: 1 # b parameter of eca module
+  inter_repr: False # whether to return intermediate representation or not (not for this stage)
+
+# Adam parameters if using Adam optimizer
+adam:
+  lr: 1e-3
+  betas:
+    - 0.9
+    - 0.999
+  eps: 1e-8
+  weight_decay: 0
+  amsgrad: False
+
+# RMSprop parameters if using RMSprop optimizer
+rmsprop:
+  lr: 1e-3
+  momentum: 0
+  alpha: 0.99
+  eps: 1e-8
+  centered: True
+  weight_decay: 0
+
+# Stochastic Weight Averaging parameters
+SWA:
+  anneal_strategy: "linear"
+  anneal_epochs: 5
+  swa_lr: 0.05

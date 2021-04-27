@@ -1,0 +1,195 @@
+# Training parameters
+train_params:
+  epochs: 1
+  optimizer: "adam"
+  save_every: 1
+  swa_start: 2 # start epoch of stochastic weight averaging
+  patience: 3 # how many epochs we want to wait after the last time the validation loss improved before breaking the training loop
+  early_stopping_delta: 0
+  max_episodes: 1000
+  episode_length: 1000
+  n_commands: 4 # number of navigational commands
+
+# Environment Config
+env:
+  host: 'localhost'
+  port: 2000
+  town: 'FullTown01-v1'
+  show_preview: False # whether or not we want to show a preview
+  steer_amp: 1.0
+  img_width: 800
+  img_height: 600
+  fov: '100'
+  n_vehicles: 100  # The range for the random numbers that are going to be generated
+  n_pedestrians: 250
+
+
+# Logger parameters
+logger:
+  project: "PMoE" # project name or workspace
+  tags: "stage_3 action"
+  resume: False # (boolean) whether to resume training or not
+  experiment_key: None # can be retrieved from logger dashboard, available if only resuming
+  log_dir: "./logs" # where to store log data
+
+# Dataloader parameters
+dataloader:
+  num_workers: 2
+  batch_size: 8
+  shuffle: True # whether to shuffle data or not
+  pin_memory: False # directly load datasets as CUDA tensors
+
+# Train dataset parameters
+dataset:
+  seed: 42 # random seed for choosing validation folders
+  crop:
+    - 125 # crop from the top (remove ski)
+    - 90  # crop from the bottom (remove hood)
+  resize:
+    - 224 # height
+    - 224 # width
+  n_commands: 4 # number of navigational commands
+  speed_factor: 10 # normalize the speed
+
+# directories
+directory:
+  model_name: "PmoE-RL"
+  save: "../checkpoint"
+  load: "../checkpoint/PmoE-RL-best.pt"
+
+# model parameters
+model:
+  device: "cpu" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
+  tau: 0.001
+  buffer_size: 100000
+  batch_size: 128
+  gamma: 0.9
+  OU: # noise params
+    mu: [0.0, 0.0]
+    sigma: [0.3, 0.1]
+    theta: [0.6, 0.15]
+  actor:
+    lr: 0.00001 # learning rate
+    exclude_freeze: [ 'model_weights', 'alpha' ] # a list of layers to stay unfrozen
+    type: 'pmoe' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained
+    model_dir: "../checkpoint/moe-e4-best.pth" # pretrained model directory, it cannot be None
+    verbose: True # show some statistics about model parameters or notn_experts: 3 # number of experts to be used
+    action_head: # speed encoder network, just an MLP
+      dims: [ 1536, 512, 512 ] # MLP dimensions. First dim should always be 1536
+      act: 'elu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+      l_act: True # use activation function on the last layer or just return scores/logits?
+      bn: True # use batchnorm?
+      dropout: 0.0
+    speed_encoder: # speed encoder network, just an MLP
+      dims: [ 1, 512, 512 ] # MLP dimensions. First dim should always be 1
+      act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+      l_act: False # use activation function on the last layer or just return scores/logits?
+      bn: True # use batchnorm?
+      dropout: 0.0
+    command_encoder: # command encoder network, just an MLP
+      dims: [ 4, 512, 512 ] # MLP dimensions. First dim should always be 4
+      act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+      l_act: False # use activation function on the last layer or just return scores/logits?
+      bn: True # use batchnorm?
+      dropout: 0.0
+    speed_prediction: # speed prediction head, just an MLP
+      dims: [ 1536, 512, 512, 1 ] # MLP dimensions. First dim should always be 1536
+      act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+      l_act: False # use activation function on the last layer or just return scores/logits?
+      bn: True # use batchnorm?
+      dropout: 0.0
+    backbone: # visual feature extractor
+      type: 'rgb' # valid values: rgb, segmentation
+      n_frames: 4 # number of input frames
+      rgb: # configs for resnet and mobilenet models
+        arch: 'resnet18' # valid values: resnet18/34/50, mobilenet_v2/3_small/large
+        pretrained: False
+        gamma: 2 # ECA gamma parameter
+        b: 1 # ECA b parameter
+      segmentation:
+        gamma: 2
+        b: 1
+        inter_repr: True # always true for this stage
+        model_dir: "../checkpoint/unet-e3-swa.pth"
+    punet:
+      past_frames: 4 # please note that data is captured at 2hz
+      future_frames: 4
+      in_features: 3
+      num_classes: 23 # number of segmentation classes, for carla 0.9.6+ it is 23
+      gamma: 2 # gamma parameter of eca module
+      b: 1 # b parameter of eca module
+      #inter_repr: False # whether PU-Net returns intermediate representation or not (not intended for training)
+      unet_inter_repr: False # whether U-Net returns intermediate representation or not (set to True if future_frames is 0)
+      model_name: "unet-swa"
+      model_path: "../checkpoint/unet-e2-swa-best.pth"
+    pmoe:
+      moe_dir: "../checkpoint/moe-e4-best.pth" # MoE pretrained model directory, it cannot be None
+      punet_dir: "" # PU-Net pretrained model with actions directory
+  critic:
+    lr: 0.001
+    backbone: # visual feature extractor
+      type: 'rgb' # valid values: rgb, segmentation
+      n_frames: 4 # number of input frames
+      rgb: # configs for resnet and mobilenet models
+        arch: 'resnet18' # valid values: resnet18/34/50, mobilenet_v2/3_small/large
+        pretrained: False
+        gamma: 2 # ECA gamma parameter
+        b: 1 # ECA b parameter
+      segmentation:
+        gamma: 2
+        b: 1
+        inter_repr: True # always true for this stage
+        model_dir: "../checkpoint/unet-e3-swa.pth"
+
+    speed_encoder: # speed encoder network, just an MLP
+      dims: [ 1, 128, 128 ] # MLP dimensions. First dim should always be 1
+      act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+      l_act: False # use activation function on the last layer or just return scores/logits?
+      bn: True # use batchnorm?
+      dropout: 0.0
+
+    command_encoder: # command encoder network, just an MLP
+      dims: [ 4, 128, 128 ] # MLP dimensions. First dim should always be 4
+      act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+      l_act: False # use activation function on the last layer or just return scores/logits?
+      bn: True # use batchnorm?
+      dropout: 0.0
+
+    action_encoder: # action encoder network, just an MLP
+      dims: [ 2, 128, 128 ] # MLP dimensions. First dim should always be 4
+      act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+      l_act: False # use activation function on the last layer or just return scores/logits?
+      bn: True # use batchnorm?
+      dropout: 0.0
+
+    value_prediction: # value prediction head, just an MLP
+      dims: [ 896, 512, 256, 256, 1 ] # MLP dimensions. First dim is the sum of [backbone, speed_encoder, command_encoder, action_encoder] outputs dim
+      act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+      l_act: False # use activation function on the last layer or just return scores/logits?
+      bn: True # use batchnorm?
+      dropout: 0.0
+
+# Adam parameters if using Adam optimizer
+adam:
+  lr: 1e-3
+  betas:
+    - 0.9
+    - 0.999
+  eps: 1e-8
+  weight_decay: 0
+  amsgrad: False
+
+# RMSprop parameters if using RMSprop optimizer
+rmsprop:
+  lr: 1e-3
+  momentum: 0
+  alpha: 0.99
+  eps: 1e-8
+  centered: True
+  weight_decay: 0
+
+# Stochastic Weight Averaging parameters
+SWA:
+  anneal_strategy: "linear"
+  anneal_epochs: 5
+  swa_lr: 0.05

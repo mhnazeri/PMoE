@@ -1,0 +1,106 @@
+# Training parameters
+train_params:
+  epochs: 100
+  device: "cuda:1" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
+  optimizer: "adam"
+  save_every: 10
+  swa_start: 80 # start epoch of stochastic weight averaging
+  patience: 3 # how many epochs we want to wait after the last time the validation loss improved before breaking the training loop
+  early_stopping_delta: 0
+
+# Logger parameters
+logger:
+  project: "PMoE" # project name or workspace
+  tags: "prediction segmentation punet stage_1 swa"
+  resume: False # (boolean) whether to resume training or not
+  experiment_key: None # can be retrieved from logger dashboard, available if only resuming
+  log_dir: "./logs" # where to store log data
+
+# Dataloader parameters
+dataloader:
+  num_workers: 30
+  batch_size: 120
+  shuffle: True # whether to shuffle data or not
+  pin_memory: True # directly load datasets as CUDA tensors
+
+# Train dataset parameters
+dataset:
+  root: "../data/train" # where data resides, relative to dataloader path
+  past_frames: 4 # number of past frames to use as input
+  future_frames: 6 # number of future frames as ground truths
+  aug_type: "segmentation" # which type of augmentation to use
+  seed: 42 # random seed for choosing validation folders
+  load_measurements: False # if you want to load measurements as label
+  batch_size: 120 # batch size, should be the same as dataloader batch_size
+  boost: 1 # boost the chance of applying augmentation
+  crop:
+    - 125 # crop from the top (remove ski)
+    - 90  # crop from the bottom (remove hood)
+  resize:
+    - 224 # height
+    - 224 # width
+  n_commands: 4 # number of navigational commands
+
+# Test dataset parameters
+val_dataset:
+  root: "../data/test" # where data resides, relative to dataloader path
+  past_frames: 4 # number of past frames to use as input
+  future_frames: 6 # number of future frames as ground truths
+  aug_type: "segmentation" # which type of augmentation to use
+  seed: 42 # random seed for choosing validation folders
+  load_measurements: False # if you want to load measurements as label
+  batch_size: 120 # batch size, should be the same as dataloader batch_size
+  boost: 1 # boost the chance of applying augmentation
+  crop:
+    - 125 # crop from the top (remove ski)
+    - 90  # crop from the bottom (remove hood)
+  resize:
+    - 224 # height
+    - 224 # width
+  n_commands: 4 # number of navigational commands
+
+# directories
+directory:
+  train_data: "../data/train" # where data resides, relative to dataloader path
+  test_data: "../data/test" # where data resides, relative to dataloader path
+  model_name: "punet"
+  save: "../checkpoint"
+  load: "../checkpoint/punet-best.pt"
+
+# model parameters
+model:
+  past_frames: 4 # please note that data is captured at 2hz
+  future_frames: 4
+  in_features: 3
+  num_classes: 23 # number of segmentation classes, for carla 0.9.6+ it is 23
+  gamma: 2 # gamma parameter of eca module
+  b: 1 # b parameter of eca module
+  inter_repr: False # whether PU-Net returns intermediate representation or not (not intended for training)
+  unet_inter_repr: False # whether U-Net returns intermediate representation or not (set to True if future_frames is 0)
+  model_name: "unet-swa"
+  model_path: "../checkpoint/unet-e2-swa-best.pth"
+
+# Adam parameters if using Adam optimizer
+adam:
+  lr: 1e-3
+  betas:
+    - 0.9
+    - 0.999
+  eps: 1e-8
+  weight_decay: 0
+  amsgrad: False
+
+# RMSprop parameters if using RMSprop optimizer
+rmsprop:
+  lr: 1e-3
+  momentum: 0
+  alpha: 0.99
+  eps: 1e-8
+  centered: True
+  weight_decay: 0
+
+# Stochastic Weight Averaging parameters
+SWA:
+  anneal_strategy: "linear"
+  anneal_epochs: 5
+  swa_lr: 0.05
