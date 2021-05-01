@@ -77,7 +77,7 @@ class EfficientBlock(nn.Module):
 
 
 class EfficientConvBlock(nn.Module):
-    """ECA conv block based on https://ieeexplore.ieee.org/document/9156697/"""
+    """Two layer ECA conv block based on https://ieeexplore.ieee.org/document/9156697/"""
 
     def __init__(
         self, in_ch: int, out_ch: int, stride: int = 1, gamma: int = 2, b: int = 1

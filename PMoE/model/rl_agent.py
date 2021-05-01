@@ -95,7 +95,7 @@ class Agent:
 
         self.update_network_parameters(tau=1)
 
-    def choose_action(
+    def sample(
         self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor
     ):
         self.actor.eval()

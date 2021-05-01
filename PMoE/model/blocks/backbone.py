@@ -16,13 +16,13 @@ def get_backbone(
     pretrained: bool = False,
     gamma: int = 2,
     b: int = 1,
-    n_classes: int = 3,
+    n_channels: int = 3,
 ):
     """Retrieve backbone model"""
     if "resnet" in arch:
-        return _get_resnet(n_frames, arch, pretrained, gamma, b, n_classes)
+        return _get_resnet(n_frames, arch, pretrained, gamma, b, n_channels)
     elif "mobilenet" in arch:
-        return _get_mobilenet(n_frames, arch, pretrained, gamma, b, n_classes)
+        return _get_mobilenet(n_frames, arch, pretrained, gamma, b, n_channels)
 
 
 def get_unet(
@@ -31,7 +31,7 @@ def get_unet(
     n_frames: int = 4,
     gamma: int = 2,
     b: int = 1,
-    n_classes: int = 3,
+    n_channels: int = 3,
 ):
     """Get UNet"""
     model = UNet(gamma=gamma, b=b, inter_repr=inter_repr)
@@ -39,7 +39,7 @@ def get_unet(
     model.load_state_dict(state_dict, strict=False)
 
     entry_block = EfficientConvBlock(
-        in_ch=n_frames * n_classes, out_ch=3, gamma=gamma, b=b
+        in_ch=n_frames * n_channels, out_ch=3, gamma=gamma, b=b
     )
 
     return nn.Sequential(entry_block, model)
@@ -51,7 +51,7 @@ def _get_resnet(
     pretrained: bool = False,
     gamma: int = 2,
     b: int = 1,
-    n_classes: int = 3,
+    n_channels: int = 3,
 ):
     """Get different versions of ResNet and change input/output dimensions"""
     model = {
@@ -61,7 +61,7 @@ def _get_resnet(
     }.get(arch.lower(), models.resnet18)(pretrained=pretrained)
 
     model.conv1 = EfficientConvBlock(
-        in_ch=n_frames * n_classes, out_ch=model.conv1.out_channels, gamma=gamma, b=b
+        in_ch=n_frames * n_channels, out_ch=model.conv1.out_channels, gamma=gamma, b=b
     )
 
     if model.fc.in_features != 512:
@@ -78,7 +78,7 @@ def _get_mobilenet(
     pretrained: bool = False,
     gamma: int = 2,
     b: int = 1,
-    n_classes: int = 3,
+    n_channels: int = 3,
 ):
     """Get different versions of mobilenet and change input/output dimensions
     Requires torchvision version 0.9.1
@@ -90,7 +90,7 @@ def _get_mobilenet(
     }.get(arch.lower(), models.mobilenet_v3_small)(pretrained=pretrained)
 
     model.features[0][0] = EfficientConvBlock(
-        in_ch=n_frames * n_classes,
+        in_ch=n_frames * n_channels,
         out_ch=model.features[0][0].out_channels,
         gamma=gamma,
         b=b,

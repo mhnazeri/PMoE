@@ -285,7 +285,7 @@ class PUNetExpert(nn.Module):
                 **{
                     **params.backbone.rgb,
                     "n_frames": params.backbone.n_frames,
-                    "n_classes": params.punet.num_classes,
+                    "n_channels": params.punet.num_classes,
                 }
             )
         )

@@ -131,7 +131,7 @@ def train(config, planner="new"):
                     )
                     score = 0
                     while not env.is_success() and not env.collided:
-                        action = agent.choose_action(images, speed, command)
+                        action = agent.sample(images, speed, command)
                         old_images = images
                         control = postprocess(action)
                         info = env.apply_control(control)
