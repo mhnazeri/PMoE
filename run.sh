@@ -3,6 +3,7 @@ export CARLA_ROOT=~/Projects/nazeri/CARLA_0.9.10.1          # change to where yo
 export PYTHONPATH=$PYTHONPATH:$CARLA_ROOT/PythonAPI/carla
 export PYTHONPATH=$PYTHONPATH:$CARLA_ROOT/PythonAPI/carla/dist/carla-0.9.10-py3.7-linux-x86_64.egg
 export PYTHONPATH=$PYTHONPATH:$CARLA_ROOT/PythonAPI/carla/agents
+export PYTHONPATH=$PYTHONPATH:PMoE
 export PYTHONPATH=$PYTHONPATH:leaderboard
 export PYTHONPATH=$PYTHONPATH:leaderboard/team_code
 export PYTHONPATH=$PYTHONPATH:scenario_runner
@@ -40,22 +41,22 @@ Help()
 run () {
   case $1 in
     stage0)
-      python trainer/train_0.py
+      python PMoE/trainer/train_0.py
       ;;
     stage1)
-      python trainer/train_1.py
+      python PMoE/trainer/train_1.py
       ;;
     stage2)
-      python trainer/train_2.py
+      python PMoE/trainer/train_2.py
       ;;
     stage3)
-      python trainer/train_3.py
+      python PMoE/trainer/train_3.py
       ;;
     benchmark)
-      python eval/benchmark_agent.py
+      python PMoE/eval/benchmark_agent.py
       ;;
     view_benchmark)
-      python eval/view_benchmark_results.py
+      python PMoE/eval/view_benchmark_results.py
       ;;
     leaderboard)
       python3 leaderboard/leaderboard/leaderboard_evaluator.py \
@@ -72,7 +73,10 @@ run () {
       exit
       ;;
     *)
-      echo "Unknown '$1' argument. It should be one of: stage0, stage1, stage2, stage3, benchmark, view_benchmark, leaderboard"
+      echo "Unknown '$1' argument. Please run with '-h' argument to see more details."
+      # Help
+      exit
+      ;;
   esac
 }
 
