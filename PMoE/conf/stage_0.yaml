@@ -1,31 +1,34 @@
 # Training parameters
 train_params:
-  epochs: 100
-  device: "cuda:1" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
+  epochs: 50
+  device: "cuda:0" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
   optimizer: "adam"
   save_every: 10
-  swa_start: 80 # start epoch of stochastic weight averaging
-  patience: 3 # how many epochs we want to wait after the last time the validation loss improved before breaking the training loop
+  swa_start: 60 # start epoch of stochastic weight averaging
+  patience: 5 # how many epochs we want to wait after the last time the validation loss improved before breaking the training loop
   early_stopping_delta: 0
+  early_stopping: False # whether to stop early or not
+  start_saving_best: 10 # start epoch of saving best model
 
 # Logger parameters
 logger:
   project: "PMoE" # project name or workspace
-  tags: "segmentation unet stage_0 swa"
+  tags: "segmentation unet stage_0"
   resume: False # (boolean) whether to resume training or not
   experiment_key: None # can be retrieved from logger dashboard, available if only resuming
   log_dir: "./logs" # where to store log data
+  disabled: False
 
 # Dataloader parameters
 dataloader:
-  num_workers: 30
-  batch_size: 128
+  num_workers: 8
+  batch_size: 64
   shuffle: True # whether to shuffle data or not
   pin_memory: True # directly load datasets as CUDA tensors
 
 # Train dataset parameters
 dataset:
-  root: "../data/train" # where data resides, relative to dataloader path
+  root: "PMoE/data/train" # where data resides, relative to dataloader path
   aug_type: "segmentation" # which type of augmentation to use
   seed: 42 # random seed for choosing validation folders
   crop:
@@ -37,7 +40,7 @@ dataset:
 
 # Test dataset parameters
 val_dataset:
-  root: "../data/test" # where data resides, relative to dataloader path
+  root: "PMoE/data/test" # where data resides, relative to dataloader path
   aug_type: "segmentation" # which type of augmentation to use
   seed: 42 # random seed for choosing validation folders
   crop:
@@ -50,8 +53,8 @@ val_dataset:
 # directories
 directory:
   model_name: "unet"
-  save: "../checkpoint"
-  load: "../checkpoint/unet-best.pt"
+  save: "PMoE/checkpoint"
+  load: "PMoE/checkpoint/unet-best.pt"
 
 # model parameters
 model:
@@ -69,7 +72,7 @@ adam:
     - 0.999
   eps: 1e-8
   weight_decay: 0
-  amsgrad: False
+  amsgrad: True
 
 # RMSprop parameters if using RMSprop optimizer
 rmsprop:
@@ -83,5 +86,5 @@ rmsprop:
 # Stochastic Weight Averaging parameters
 SWA:
   anneal_strategy: "linear"
-  anneal_epochs: 5
-  swa_lr: 0.05
+  anneal_epochs: 50
+  swa_lr: 0.0005

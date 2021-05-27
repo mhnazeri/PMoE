@@ -1,37 +1,43 @@
 # Training parameters
 train_params:
-  epochs: 100
-  device: "cuda:1" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
+  epochs: 80
+  device: "cuda:0" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
   optimizer: "adam"
   save_every: 10
-  swa_start: 80 # start epoch of stochastic weight averaging
-  patience: 3 # how many epochs we want to wait after the last time the validation loss improved before breaking the training loop
+  swa_start: 180 # start epoch of stochastic weight averaging
+  patience: 5 # how many epochs we want to wait after the last time the validation loss improved before breaking the training loop
   early_stopping_delta: 0
+  early_stopping: False
+  grad_clipping: 1.0
+  loss_type: "tversky" # which loss to use. Valid losses are l1, l2, tversky
+  start_saving_best: 10 # start epoch of saving best model
 
 # Logger parameters
 logger:
   project: "PMoE" # project name or workspace
-  tags: "prediction segmentation punet stage_1 swa"
-  resume: False # (boolean) whether to resume training or not
-  experiment_key: None # can be retrieved from logger dashboard, available if only resuming
+  experiment_name: 'punet'
+  tags: "prediction segmentation punet stage_1"
+  resume: True # (boolean) whether to resume training or not
+  experiment_key: 'd2adc1fae7f24cad88b6b6523a36245d' # can be retrieved from logger dashboard, available if only resuming
   log_dir: "./logs" # where to store log data
+  disabled: False
 
 # Dataloader parameters
 dataloader:
-  num_workers: 30
-  batch_size: 120
+  num_workers: 8
+  batch_size: 10
   shuffle: True # whether to shuffle data or not
-  pin_memory: True # directly load datasets as CUDA tensors
+  pin_memory: True # use pageable memory or pinned memory (https://developer.nvidia.com/blog/how-optimize-data-transfers-cuda-cc/)
 
 # Train dataset parameters
 dataset:
-  root: "../data/train" # where data resides, relative to dataloader path
+  root: "PMoE/data/train" # where data resides, relative to dataloader path
   past_frames: 4 # number of past frames to use as input
   future_frames: 6 # number of future frames as ground truths
   aug_type: "segmentation" # which type of augmentation to use
   seed: 42 # random seed for choosing validation folders
   load_measurements: False # if you want to load measurements as label
-  batch_size: 120 # batch size, should be the same as dataloader batch_size
+  batch_size: 10 # batch size, should be the same as dataloader batch_size
   boost: 1 # boost the chance of applying augmentation
   crop:
     - 125 # crop from the top (remove ski)
@@ -43,13 +49,13 @@ dataset:
 
 # Test dataset parameters
 val_dataset:
-  root: "../data/test" # where data resides, relative to dataloader path
+  root: "PMoE/data/test" # where data resides, relative to dataloader path
   past_frames: 4 # number of past frames to use as input
   future_frames: 6 # number of future frames as ground truths
   aug_type: "segmentation" # which type of augmentation to use
   seed: 42 # random seed for choosing validation folders
   load_measurements: False # if you want to load measurements as label
-  batch_size: 120 # batch size, should be the same as dataloader batch_size
+  batch_size: 10 # batch size, should be the same as dataloader batch_size
   boost: 1 # boost the chance of applying augmentation
   crop:
     - 125 # crop from the top (remove ski)
@@ -61,34 +67,32 @@ val_dataset:
 
 # directories
 directory:
-  train_data: "../data/train" # where data resides, relative to dataloader path
-  test_data: "../data/test" # where data resides, relative to dataloader path
-  model_name: "punet"
-  save: "../checkpoint"
-  load: "../checkpoint/punet-best.pt"
+  model_name: "punet" # use this name to same checkpoint
+  save: "PMoE/checkpoint"
+  load: "PMoE/checkpoint/punet-e60.pth"
 
 # model parameters
 model:
   past_frames: 4 # please note that data is captured at 2hz
-  future_frames: 4
+  future_frames: 6
   in_features: 3
   num_classes: 23 # number of segmentation classes, for carla 0.9.6+ it is 23
   gamma: 2 # gamma parameter of eca module
   b: 1 # b parameter of eca module
   inter_repr: False # whether PU-Net returns intermediate representation or not (not intended for training)
   unet_inter_repr: False # whether U-Net returns intermediate representation or not (set to True if future_frames is 0)
-  model_name: "unet-swa"
-  model_path: "../checkpoint/unet-e2-swa-best.pth"
+  model_name: "unet"
+  model_path: "PMoE/checkpoint/unet-best.pth"
 
 # Adam parameters if using Adam optimizer
 adam:
-  lr: 1e-3
+  lr: 1e-4
   betas:
     - 0.9
     - 0.999
   eps: 1e-8
   weight_decay: 0
-  amsgrad: False
+  amsgrad: True
 
 # RMSprop parameters if using RMSprop optimizer
 rmsprop:
@@ -102,5 +106,5 @@ rmsprop:
 # Stochastic Weight Averaging parameters
 SWA:
   anneal_strategy: "linear"
-  anneal_epochs: 5
-  swa_lr: 0.05
+  anneal_epochs: 30
+  swa_lr: 0.00005

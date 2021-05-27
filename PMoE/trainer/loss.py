@@ -1,4 +1,4 @@
-"""Tversky Loss"""
+"""Collection of loss functions"""
 import torch
 import torch.nn as nn
 
@@ -17,21 +17,21 @@ def class_dice(pred, target, epsilon=1e-6):
     return dice
 
 
-def tversky_loss(pred, target, alpha=0.5, beta=0.5):
+def dice_score(pred, target, epsilon=1e-6):
     num_classes = pred.size(1)
-    target_oh = torch.eye(num_classes)[target.squeeze(1)]
-    target_oh = target_oh.permute(0, 3, 1, 2).float()
-    probs = nn.functional.softmax(pred, dim=1)
-    target_oh = target_oh.type(pred.type())
-    dims = (0,) + tuple(range(2, target.ndimension()))
-    inter = torch.sum(probs * target_oh, dims)
-    fps = torch.sum(probs * (1 - target_oh), dims)
-    fns = torch.sum((1 - probs) * target_oh, dims)
-    t = (inter / (inter + (alpha * fps) + (beta * fns))).mean()
-    return 1 - t
+    pred_class = torch.argmax(pred, dim=1)
+    dice = torch.ones(num_classes, dtype=torch.float, device=pred.device)
+    for c in range(num_classes):
+        p = pred_class == c
+        t = target == c
+        inter = (p * t).sum().float() + epsilon
+        union = p.sum() + t.sum() + epsilon
+        d = 2 * inter / union
+        dice[c] = d
+    return dice
 
 
-def tversky_loss_v2(pred, target, alpha=0.5, beta=0.5):
+def tversky_loss(pred, target, alpha=0.5, beta=0.5):
     # num_classes = pred.size(1)
     target_oh = torch.zeros_like(pred, dtype=torch.float, device=pred.device)
     target_oh.scatter_(dim=-3, index=target.unsqueeze(-3), value=1.0)
@@ -44,68 +44,79 @@ def tversky_loss_v2(pred, target, alpha=0.5, beta=0.5):
     return 1 - t
 
 
-def cross_entropy_dice_weighted_loss(
+def cross_entropy_tversky_weighted_loss(
     pred, target, cross_entropy_weight=0.5, tversky_weight=0.5
 ):
     if cross_entropy_weight + tversky_weight != 1:
         raise ValueError("Cross Entropy weight and Tversky weight should " "sum to 1")
     ce = nn.functional.cross_entropy(pred, target, weight=class_dice(pred, target))
-    tv = tversky_loss_v2(pred, target)
+    tv = tversky_loss(pred, target)
     loss = (cross_entropy_weight * ce) + (tversky_weight * tv)
     return loss
 
 
-def gdl_loss(inputs: torch.Tensor, targets: torch.Tensor, reduction: str = "mean"):
-    num_classes = inputs.shape[-3]
-    print(f"{num_classes=}")
-    # make target a tensor with num_class dimension as for channels
-    target_oh = torch.eye(num_classes)[targets.squeeze()]
-    target_oh = target_oh.permute(0, 1, 4, 2, 3).float()
-    print(f"{target_oh.shape}")
-    sums = 0
-    for inp, target in zip(inputs, target_oh):
-        sums += torch.abs_(
-            torch.abs_(target[:, :, 1:, 1:] - target[:, :, :-1, :-1])
-            - torch.abs_(inp[:, :, 1:, 1:] - inp[:, :, :-1, :-1])
-        ).sum()
-
-    if reduction == "sum":
-        return sums
-    elif reduction == "mean":
-        return sums / inputs.shape[0]  # average between frames
-
-
 def l1_gdl(inputs: torch.Tensor, targets: torch.Tensor):
-    """L1+Gradient difference loss according to 'Predicting Deeper into the Future of Semantic Segmentation' paper"""
+    """L1+Gradient difference loss according to 'Predicting Deeper into the Future of Semantic Segmentation' paper
+
+    inputs and targets have shape (B, T, C, H, W)
+    """
     l1_loss = nn.L1Loss()
-    num_classes = inputs.shape[-3]
-    # bring Time dim to the front
-    # targets = targets.transpose(0, 1)
-    # make target a tensor with num_class dimension as for channels
-    target_oh = torch.eye(num_classes)[targets.squeeze()]
-    # (B, T, H, W, C) -> (B, T, C, H, W)
-    target_oh = target_oh.permute(0, 1, 4, 2, 3).float()
-    gdl_sum = 0
-    l1_sum = 0
+    target_oh = torch.zeros_like(inputs, dtype=torch.float, device=inputs.device)
+    target_oh.scatter_(dim=-3, index=targets.unsqueeze(-3), value=1.0)
+    inputs_soft = torch.nn.functional.softmax(inputs, dim=-3)
+    pad_right = nn.ZeroPad2d((0, 1, 0, 0))
+    pad_bottom = nn.ZeroPad2d((0, 0, 0, 1))
 
-    gdl_sum += (
+    gdl_sum = (
         torch.abs_(
-            torch.abs_(target_oh[..., 1:, :] - target_oh[..., :-1, :])
-            - torch.abs_(inputs[..., 1:, :] - inputs[..., :-1, :])
+            torch.abs_(pad_bottom(target_oh[:, -1, ...])[..., :, 1:, :] - pad_bottom(target_oh[:, -1, ...])[..., :, :-1, :])
+            - torch.abs_(pad_bottom(inputs[:, -1, ...])[..., :, 1:, :] - pad_bottom(inputs[:, -1, ...])[..., :, :-1, :])
         )
-        .mean(dim=-3)
-        .sum()
         + torch.abs_(
-            torch.abs_(target_oh[..., :, 1:] - target_oh[..., :, :-1])
-            - torch.abs_(inputs[..., :, 1:] - inputs[..., :, :-1])
+            torch.abs_(pad_right(target_oh[:, -1, ...])[..., :, :, :-1] - pad_right(target_oh[:, -1, ...])[..., :, :, 1:])
+            - torch.abs_(pad_right(inputs[:, -1, ...])[..., :, :, :-1] - pad_right(inputs[:, -1, ...])[..., :, :, 1:])
         )
-        .mean(dim=-3)
-        .sum()
-    )
-    gdl_sum /= inputs.shape[0]  # divide by batch_size
-    l1_sum += l1_loss(inputs, target_oh)
+    ).sum(dim=(-2, -1)).mean()
 
-    return (gdl_sum + l1_sum) / inputs.shape[1]  # average between frames
+    # gdl_sum /= inputs.shape[0]  # divide by batch_size
+    l1_sum = l1_loss(inputs[:, -1, ...], target_oh[:, -1, ...])
+
+    return (l1_sum + gdl_sum) # / inputs.shape[1]  # average between frames
+
+
+class AutoregressiveCriterion(nn.Module):
+    def __init__(self, n_target_frames: int = 1, loss_type: str = 'tversky'):
+        """Multi frames loss which backpropagate loss error through time"""
+        super().__init__()
+        self.n_target_frames = n_target_frames
+        self.loss_type = loss_type
+        self.loss = None
+        if loss_type == 'l1':
+            self.loss = nn.L1Loss()
+        elif loss_type == 'l2':
+            self.loss = nn.MSELoss()
+        elif loss_type == 'tversky':
+            self.loss = cross_entropy_tversky_weighted_loss
+        else:
+            raise ValueError(f"Unknown loss type {loss_type}, supported ones are L1, L2, and tversky")
+
+    def forward(self, inputs, targets):
+        """inputs shape is (B, T, C, H, W) where C is 23
+          targets shape is (B, T, C, H, W) where C is 1
+        """
+        assert inputs.size(1) == self.n_target_frames
+        assert targets.size(1) == self.n_target_frames
+
+        if self.loss_type != 'tversky':
+            target_oh = torch.zeros_like(inputs, dtype=torch.float, device=inputs.device)
+            target_oh.scatter_(dim=-3, index=targets.unsqueeze(-3), value=1.0)
+            targets = target_oh
+
+        final_loss = 0
+        for t in range(self.n_target_frames):
+            final_loss += self.loss(inputs[:, t, ...], targets[:, t, ...])
+
+        return final_loss
 
 
 def moe_loss(action_dists, speed_pred, actions_gt, speed_gt, loss_coefs):
