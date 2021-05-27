@@ -73,14 +73,16 @@ class Learner:
             raise ValueError(f"Unknown optimizer {self.cfg.train_params.optimizer}")
 
         self.lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=100
+            self.optimizer, T_max=self.cfg.train_params.epochs
         )
         if self.cfg.model.type in ["moe", "moe_alt", "moe_shared"]:
             self.criterion = moe_loss
-        elif self.model.type in ["punet", "punet_inter"]:
+        elif self.cfg.model.type in ["punet", "punet_inter"]:
             self.criterion = punet_loss
-        elif self.model.type in ["pmoe", "pmoe+pretrained"]:
+        elif self.cfg.model.type in ["pmoe", "pmoe+pretrained"]:
             self.criterion = pmoe_loss
+        else:
+            raise ValueError(f"There is no loss for {self.cfg.model.type}")
 
         if self.cfg.logger.resume:
             # load checkpoint
@@ -91,6 +93,7 @@ class Learner:
             self.optimizer.load_state_dict(checkpoint["optimizer"])
             self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
             self.epoch = checkpoint["epoch"]
+            self.iteration = checkpoint["iteration"]
             self.logger.set_epoch(self.epoch)
             self.best = checkpoint["best"]
             self.e_loss = checkpoint["e_loss"]
@@ -101,6 +104,7 @@ class Learner:
             )
         else:
             self.epoch = 1
+            self.iteration = 1
             self.best = np.inf
             self.e_loss = []
 
@@ -116,6 +120,7 @@ class Learner:
         self.swa_scheduler = SWALR(self.optimizer, **self.cfg.SWA)
 
     def train(self):
+        print_swa_start = True
         if DEBUG:
             torch.autograd.set_detect_anomaly(True)
 
@@ -128,7 +133,6 @@ class Learner:
                 desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}",
             )
             for idx, (img, measurements) in bar:
-                self.optimizer.zero_grad()
                 # move data to device
                 img = img.to(device=self.device)
                 # measurements = {'control', 'speed', 'target_speed', 'command'}
@@ -149,7 +153,11 @@ class Learner:
                     target_speed,
                     self.cfg.model.loss_coefs,
                 )
+                self.optimizer.zero_grad()
                 loss.backward()
+                # clip weights
+                if self.cfg.train_params.grad_clipping > 0:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.train_params.grad_clipping)
                 # check grad norm for debugging
                 grad_norm = check_grad_norm(self.model)
                 # update
@@ -159,57 +167,71 @@ class Learner:
                 bar.set_postfix(loss=loss.item(), Grad_Norm=grad_norm)
                 self.logger.log_metrics(
                     {
-                        "epoch": self.epoch,
-                        "batch": idx,
                         "batch_loss": loss.item(),
-                        "GradNorm": grad_norm,
-                    }
+                        "grad_norm": grad_norm,
+                    },
+                    epoch=self.epoch,
+                    step=self.iteration
                 )
+                self.iteration += 1
             bar.close()
-            # validate on val set
-            val_loss, t = self.validate()
-            t /= len(self.val_dataset)  # time is calculated over the whole val_data
-
             if self.epoch >= self.cfg.train_params.swa_start:
+                if print_swa_start:
+                    print(f"Epoch {self.epoch}, step {self.iteration}, starting SWA!")
+                    print_swa_start = False
+
                 self.swa_model.update_parameters(self.model)
                 self.swa_scheduler.step()
             else:
                 self.lr_scheduler.step()
 
+            # validate on val set
+            val_loss, t = self.validate()
+            t /= len(self.val_dataset)  # time is calculated over the whole val_data
+
             # average loss for an epoch
             self.e_loss.append(np.mean(running_loss))  # epoch loss
             print(
                 f"{datetime.now():%Y-%m-%d %H:%M:%S} Epoch {self.epoch:03} summary: train loss: {self.e_loss[-1]:.2f} \t| val loss: {val_loss:.2f}"
-                f"\t| time: {t:.3f} seconds"
+                f"\t| time: {t:.3f} seconds\n"
             )
             self.logger.log_metrics(
                 {
-                    "epoch": self.epoch,
-                    "epoch_loss": self.e_loss[-1],
+                    "train_loss": self.e_loss[-1],
                     "val_loss": val_loss,
                     "time": t,
-                }
+                },
+                epoch=self.epoch
             )
 
             # early_stopping needs the validation loss to check if it has decreased,
             # and if it has, it will make a checkpoint of the current model
             self.early_stopping(val_loss, self.model)
 
-            if self.early_stopping.early_stop:
+            if self.early_stopping.early_stop and self.cfg.train_params.early_stopping:
                 print("Early stopping")
                 self.save()
                 break
 
-            if self.epoch % self.cfg.train_params.save_every == 0:
+            if self.epoch % self.cfg.train_params.save_every == 0 or (self.e_loss[-1] < self.best and
+                                                                      self.epoch % self.cfg.train_params.start_saving_best == 0):
+
                 self.save()
 
             gc.collect()
             self.epoch += 1
 
         # Update bn statistics for the swa_model at the end and save the model
-        # if self.epoch >= self.cfg.train_params.swa_start:
+        if self.epoch >= self.cfg.train_params.swa_start:
         #     torch.optim.swa_utils.update_bn(self.data, self.swa_model)
-        #     self.save(name=self.cfg.directory.model_name + "-final-swa")
+            for img, measurements in self.data:
+                img = img.to(device=self.device)
+                speed = measurements["speed"].to(device=self.device).unsqueeze(-1)
+                command = measurements["command"].to(device=self.device)
+
+                self.swa_model(img, speed, command)
+
+            self.save(name=self.cfg.directory.model_name + "-final-swa")
 
         # macs, params = op_counter(self.model, sample=(img, speed, command))
         self.model.eval()
@@ -238,25 +260,28 @@ class Learner:
             # forward, backward
             if self.epoch >= self.cfg.train_params.swa_start:
                 action, _ = self.swa_model(img, speed, command)
-                action = action.sample()
+                if 'punet' in self.cfg.model.type:
+                    action = action.clamp(-1.0, 1.0)
+                else:
+                    action = action.sample().clamp(-1.0, 1.0)
             else:
-                action = self.model.sample(img, speed, command)
+                action = self.model.sample(img, speed, command).clamp(-1.0, 1.0)
 
             loss = torch.nn.functional.l1_loss(action, control)
             running_loss.append(loss.item())
 
-        if self.epoch % self.cfg.train_params.save_every == 0:
-            # select a random sample to log
-            idx = np.random.randint(0, img.size(0))
-            measurements = {
-                "control": measurements["control"][idx],
-                "speed": measurements["speed"][idx],
-                "command": measurements["command"][idx],
-            }
-            log_image = draw_on_image(
-                img[idx, -1, ...].cpu(), measurements, action[idx].cpu()
-            )
-            self.logger.log_image(log_image, name="val_sample_" + str(self.epoch))
+        # if self.epoch % self.cfg.train_params.save_every == 0:
+        # select a random sample to log
+        idx = np.random.randint(0, img.size(0))
+        measurements = {
+            "control": measurements["control"][idx],
+            "speed": measurements["speed"][idx],
+            "command": measurements["command"][idx],
+        }
+        log_image = draw_on_image(
+            img[idx, -1, ...].cpu(), measurements, action[idx].cpu()
+        )
+        self.logger.log_image(log_image, name=f"sample_{self.epoch:03}", step=self.iteration)
 
         # average loss
         loss = np.mean(running_loss)
@@ -268,7 +293,7 @@ class Learner:
 
         # First, let's see if we continue or start fresh:
         CONTINUE_RUN = cfg.resume
-        if EXPERIMENT_KEY is not None:
+        if EXPERIMENT_KEY and CONTINUE_RUN:
             # There is one, but the experiment might not exist yet:
             api = comet_ml.API()  # Assumes API key is set in config/env
             try:
@@ -311,6 +336,7 @@ class Learner:
                 auto_histogram_gradient_logging=True,
                 auto_histogram_activation_logging=True,
             )
+            logger.set_name(cfg.experiment_name)
             logger.add_tags(cfg.tags.split())
             logger.log_parameters(self.cfg)
 
@@ -319,6 +345,7 @@ class Learner:
     def save(self, name=None):
         checkpoint = {
             "epoch": self.epoch,
+            "iteration": self.iteration,
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "lr_scheduler": self.lr_scheduler.state_dict(),
@@ -343,6 +370,6 @@ class Learner:
 
 
 if __name__ == "__main__":
-    cfg_path = "../conf/stage_2"
+    cfg_path = "PMoE/conf/stage_2"
     learner = Learner(cfg_path)
     learner.train()

@@ -18,7 +18,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.optim.swa_utils import AveragedModel, SWALR
 
-from loss import cross_entropy_dice_weighted_loss, class_dice
+from loss import cross_entropy_tversky_weighted_loss, dice_score
 from model.blocks.unet import UNet
 from model.data_loader import CarlaSeg
 from utils.nn import check_grad_norm, init_weights_normal, EarlyStopping, op_counter
@@ -63,9 +63,9 @@ class Learner:
             raise ValueError(f"Unknown optimizer {self.cfg.train_params.optimizer}")
 
         self.lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=100
+            self.optimizer, T_max=self.cfg.train_params.epochs
         )
-        self.criterion = cross_entropy_dice_weighted_loss
+        self.criterion = cross_entropy_tversky_weighted_loss
 
         if self.cfg.logger.resume:
             # load checkpoint
@@ -101,6 +101,7 @@ class Learner:
         self.swa_scheduler = SWALR(self.optimizer, **self.cfg.SWA)
 
     def train(self):
+        print_swa_start = True
         if DEBUG:
             torch.autograd.set_detect_anomaly(True)
         while self.epoch <= self.cfg.train_params.epochs:
@@ -112,7 +113,6 @@ class Learner:
                 desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}",
             )
             for idx, (img, mask) in bar:
-                self.optimizer.zero_grad()
                 # move data to device
                 img = img.to(device=self.device)
                 mask = mask.to(device=self.device)
@@ -120,6 +120,7 @@ class Learner:
                 # forward, backward
                 out = self.model(img)
                 loss = self.criterion(out, mask)
+                self.optimizer.zero_grad()
                 loss.backward()
                 # check grad norm for debugging
                 grad_norm = check_grad_norm(self.model)
@@ -137,22 +138,27 @@ class Learner:
                     }
                 )
             bar.close()
+
+            if self.epoch >= self.cfg.train_params.swa_start:
+                if print_swa_start:
+                    print(f"Epoch {self.epoch}, starting SWA!")
+                    print_swa_start = False
+
+                self.swa_model.update_parameters(self.model)
+                self.swa_scheduler.step()
+            else:
+                self.lr_scheduler.step()
             # validate on val set
             val_loss, t = self.validate()
             t /= len(self.val_dataset)  # time is calculated over the whole val_data
             self.dice = val_loss[1]
 
-            if self.epoch >= self.cfg.train_params.swa_start:
-                self.swa_model.update_parameters(self.model)
-                self.swa_scheduler.step()
-            else:
-                self.lr_scheduler.step()
 
             # average loss for an epoch
             self.e_loss.append(np.mean(running_loss))  # epoch loss
             print(
                 f"{datetime.now():%Y-%m-%d %H:%M:%S} Epoch {self.epoch:03} summary: train loss: {self.e_loss[-1]:.2f} \t| val loss: {val_loss[0]:.2f}"
-                f"\t| dice: {val_loss[1]:.2f} \t| time: {t:.3f} seconds"
+                f"\t| dice: {val_loss[1]:.2f} \t| time: {t:.3f} seconds\n"
             )
             self.logger.log_metrics(
                 {
@@ -168,12 +174,14 @@ class Learner:
             # and if it has, it will make a checkpoint of the current model
             self.early_stopping(val_loss[0], self.model)
 
-            if self.early_stopping.early_stop:
+            if self.early_stopping.early_stop and self.cfg.train_params.early_stopping:
                 print("Early stopping")
                 self.save()
                 break
 
-            if self.epoch % self.cfg.train_params.save_every == 0:
+            if self.epoch % self.cfg.train_params.save_every == 0 or (self.dice > self.best
+                                                                      and self.epoch % self.cfg.train_params.start_saving_best == 0):
+
                 self.save()
 
             gc.collect()
@@ -181,7 +189,11 @@ class Learner:
 
         # Update bn statistics for the swa_model at the end and save the model
         if self.epoch >= self.cfg.train_params.swa_start:
-            torch.optim.swa_utils.update_bn(self.data, self.swa_model)
+            # torch.optim.swa_utils.update_bn(self.data.to(device=self.device), self.swa_model)
+            for img, _ in self.data:
+                img = img.to(device=self.device)
+                self.swa_model(img)
+
             self.save(name=self.cfg.directory.model_name + "-final-swa")
 
         macs, params = op_counter(self.model, sample=img)
@@ -209,20 +221,20 @@ class Learner:
 
             loss = self.criterion(out, mask)
             running_loss.append(loss.item())
-            d_loss = class_dice(out, mask)
-            running_dice.append(d_loss)
+            d_loss = dice_score(out, mask)
+            running_dice.append(d_loss.cpu())
 
-        if self.epoch % self.cfg.train_params.save_every == 0:
-            # only log 4 data samples from the last iteration
-            for img_id, (image, predicted, gt) in enumerate(
-                zip(img[:4, ...], out[:4, ...], mask[:4, ...])
-            ):
-                out_decoded = torch.from_numpy(decode_mask(predicted.cpu()))
-                mask_decoded = torch.from_numpy(decode_mask(gt.cpu()))
-                log_image = torch.cat([image.cpu(), out_decoded, mask_decoded], dim=-1)
-                self.logger.log_image(
-                    log_image, name="val_sample_" + str(img_id), image_channels="first"
-                )
+        #if self.epoch % self.cfg.train_params.save_every == 0:
+        # only log 4 data samples from the last iteration
+        for img_id, (image, predicted, gt) in enumerate(
+            zip(img[:4, ...], out[:4, ...], mask[:4, ...])
+        ):
+            out_decoded = torch.from_numpy(decode_mask(predicted.cpu()))
+            mask_decoded = torch.from_numpy(decode_mask(gt.cpu()))
+            log_image = torch.cat([image.cpu(), out_decoded, mask_decoded], dim=-1)
+            self.logger.log_image(
+                log_image, name="sample_" + str(img_id), image_channels="first"
+            )
 
         # average loss
         loss = np.mean(running_loss)
@@ -280,6 +292,7 @@ class Learner:
             #    set COMET_EXPERIMENT_KEY, the experiment will get a
             #    random key!
             logger = comet_ml.Experiment(
+                disabled=cfg.disabled,
                 project_name=cfg.project,
                 auto_histogram_weight_logging=True,
                 auto_histogram_gradient_logging=True,
@@ -318,6 +331,6 @@ class Learner:
 
 
 if __name__ == "__main__":
-    cfg_path = "../conf/stage_0"
+    cfg_path = "PMoE/conf/stage_0"
     learner = Learner(cfg_path)
     learner.train()

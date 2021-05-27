@@ -121,7 +121,7 @@ def draw_on_image(img, measurements, action):
     )
     draw = ImageDraw.Draw(img)
     # load font
-    fnt = ImageFont.truetype("../misc_files/FUTURAM.ttf", 11)
+    fnt = ImageFont.truetype("PMoE/misc_files/FUTURAM.ttf", 11)
     draw.text((5, 10), "Speed: %.3f" % speed, fill=(0, 255, 0, 255), font=fnt)
     draw.text((5, 30), "Steer: %.3f" % steer, fill=(255, 0, 0, 255), font=fnt)
     draw.text((5, 50), "Throttle: %.3f" % throttle, fill=(255, 0, 0, 255), font=fnt)
@@ -146,7 +146,7 @@ def draw_on_image(img, measurements, action):
         (img_width, 70), "Brake (GT): %.3f" % brake_gt, fill=(0, 255, 0, 255), font=fnt
     )
 
-    return img
+    return np.array(img)
 
 
 if __name__ == "__main__":

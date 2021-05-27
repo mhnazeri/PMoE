@@ -38,15 +38,16 @@ class PredictiveUnet(nn.Module):
             inter_repr=unet_inter_repr,
         )
         checkpoint = torch.load(model_path)
-        unet_weights = self.unet.state_dict()
+        # unet_weights = self.unet.state_dict()
         pre_trained_unet_weights = checkpoint[model_name]
-        pre_trained_unet_weights = {
-            k: v
-            for k, v in pre_trained_unet_weights.items()
-            if k in self.unet.state_dict().keys()
-        }
-        unet_weights.update(pre_trained_unet_weights)
-        self.unet.load_state_dict(unet_weights)
+        # pre_trained_unet_weights = {
+        #     k: v
+        #     for k, v in pre_trained_unet_weights.items()
+        #     if k in self.unet.state_dict().keys()
+        # }
+        # unet_weights.update(pre_trained_unet_weights)
+        # self.unet.load_state_dict(unet_weights)
+        self.unet.load_state_dict(pre_trained_unet_weights, strict=False)
         # freeze unet weights
         for p in self.unet.parameters():
             p.requires_grad = False
@@ -69,7 +70,7 @@ class PredictiveUnet(nn.Module):
         #     k: v for k, v in pre_trained_unet_weights.items()
         #     if k in self.unet.state_dict().keys() and k != 'dwn_1.0.weight'
         # }
-        self.pred_unet.load_state_dict(pre_trained_unet_weights, strict=False)
+        # self.pred_unet.load_state_dict(pre_trained_unet_weights, strict=False)
 
     def forward(self, img_list: torch.Tensor) -> torch.Tensor:
         """Forward computation of PU-Net network.

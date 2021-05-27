@@ -189,7 +189,7 @@ def train(config, planner="new"):
 
         score_history.append(score)
         print(
-            f"{datetime.now():%Y-%m-%d %H:%M:%S} Episode {episode:03}, score is {score:03}"
+            f"{datetime.now():%Y-%m-%d %H:%M:%S} Episode {episode:03}, score is {score:03}\n"
         )
         logger.log_metrics(
             {
@@ -202,7 +202,7 @@ def train(config, planner="new"):
             "speed": speed,
             "command": command,
         }
-        log_image = draw_on_image(images.squeeze()[-2, ...].cpu(), measurements, action)
+        log_image = draw_on_image(images.squeeze()[-2, ...].detach().cpu(), measurements, action)
         logger.log_image(log_image, name="sample_" + str(episode))
 
         if episode % config.train_params.save_every == 0:
@@ -235,5 +235,5 @@ def save(model, episode, score, current_score, dir, name=None):
 
 
 if __name__ == "__main__":
-    cfg = get_conf("../conf/stage_3.yaml")
+    cfg = get_conf("PMoE/conf/stage_3.yaml")
     train(cfg)

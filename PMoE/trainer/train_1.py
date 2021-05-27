@@ -17,7 +17,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.optim.swa_utils import AveragedModel, SWALR
 
-from loss import l1_gdl, class_dice
+from loss import AutoregressiveCriterion, dice_score
 from model.punet import PredictiveUnet
 from model.data_loader import CarlaSegPred
 from utils.nn import check_grad_norm, init_weights_normal, EarlyStopping, op_counter
@@ -69,9 +69,12 @@ class Learner:
             raise ValueError(f"Unknown optimizer {self.cfg.train_params.optimizer}")
 
         self.lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=100
+            self.optimizer, T_max=self.cfg.train_params.epochs
         )
-        self.criterion = l1_gdl
+        # loss function
+        self.criterion = AutoregressiveCriterion(self.cfg.model.future_frames,
+                                                 self.cfg.train_params.loss_type
+                                                )
 
         if self.cfg.logger.resume:
             # load checkpoint
@@ -82,6 +85,7 @@ class Learner:
             self.optimizer.load_state_dict(checkpoint["optimizer"])
             self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
             self.epoch = checkpoint["epoch"]
+            self.iteration = checkpoint["iteration"]
             self.logger.set_epoch(self.epoch)
             self.best = checkpoint["best"]
             self.e_loss = checkpoint["e_loss"]
@@ -92,6 +96,7 @@ class Learner:
             )
         else:
             self.epoch = 1
+            self.iteration = 1
             self.best = -np.inf
             self.e_loss = []
 
@@ -107,6 +112,8 @@ class Learner:
         self.swa_scheduler = SWALR(self.optimizer, **self.cfg.SWA)
 
     def train(self):
+        print_swa_start = True
+
         if DEBUG:
             torch.autograd.set_detect_anomaly(True)
 
@@ -119,7 +126,6 @@ class Learner:
                 desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}",
             )
             for idx, (img, mask) in bar:
-                self.optimizer.zero_grad()
                 # move data to device
                 img = img.to(device=self.device)
                 mask = mask.to(device=self.device)
@@ -127,7 +133,11 @@ class Learner:
                 # forward, backward
                 out = self.model(img)
                 loss = self.criterion(out, mask)
+                self.optimizer.zero_grad()
                 loss.backward()
+                # clip weights
+                if self.cfg.train_params.grad_clipping > 0:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.train_params.grad_clipping)
                 # check grad norm for debugging
                 grad_norm = check_grad_norm(self.model)
                 # update
@@ -137,50 +147,62 @@ class Learner:
                 bar.set_postfix(loss=loss.item(), Grad_Norm=grad_norm)
                 self.logger.log_metrics(
                     {
-                        "epoch": self.epoch,
-                        "batch": idx,
                         "batch_loss": loss.item(),
-                        "GradNorm": grad_norm,
-                    }
+                        "grad_norm": grad_norm,
+                    },
+                    epoch=self.epoch,
+                    step=self.iteration
                 )
-            bar.close()
-            # validate on val set
-            val_loss, t = self.validate()
-            t /= len(self.val_dataset)  # time is calculated over the whole val_data
-            self.dice = val_loss[1]
 
+                self.iteration += 1
+
+            bar.close()
             if self.epoch >= self.cfg.train_params.swa_start:
+                if print_swa_start:
+                    print(f"Epoch {self.epoch}, step {self.iteration}, starting SWA!")
+                    print_swa_start = False
+
                 self.swa_model.update_parameters(self.model)
                 self.swa_scheduler.step()
             else:
                 self.lr_scheduler.step()
 
+            # if 'cuda' in self.cfg.train_params.device:
+            #     torch.cuda.empty_cache()
+            # validate on val set
+            val_loss, t = self.validate()
+            t /= len(self.val_dataset)  # time is calculated over the whole val_data
+            self.dice = val_loss[1]
+
             # average loss for an epoch
             self.e_loss.append(np.mean(running_loss))  # epoch loss
             print(
-                f"{datetime.now():%Y-%m-%d %H:%M:%S} Epoch {self.epoch:03} summary: train loss: {self.e_loss[-1]:.2f} \t| val loss: {val_loss[0]:.2f}"
-                f"\t| dice: {val_loss[1]:.2f} \t| time: {t:.3f} seconds"
+                f"{datetime.now():%Y-%m-%d %H:%M:%S} Epoch {self.epoch:03} summary:\n\t train loss: {self.e_loss[-1]:.2f} \t| val loss: {val_loss[0]:.2f}"
+                f"\t| dice: {val_loss[1]:.2f} \t| time: {t:.3f} seconds\n"
             )
             self.logger.log_metrics(
                 {
-                    "epoch": self.epoch,
-                    "epoch_loss": self.e_loss[-1],
+                    "train_loss": self.e_loss[-1],
                     "val_loss": val_loss[0],
                     "dice": val_loss[1],
                     "time": t,
-                }
+                },
+                step=self.iteration,
+                epoch=self.epoch
             )
 
             # early_stopping needs the validation loss to check if it has decreased,
             # and if it has, it will make a checkpoint of the current model
             self.early_stopping(val_loss[0], self.model)
 
-            if self.early_stopping.early_stop:
+            if self.early_stopping.early_stop and self.cfg.train_params.early_stopping:
                 print("Early stopping")
                 self.save()
                 break
 
-            if self.epoch % self.cfg.train_params.save_every == 0:
+            if self.epoch % self.cfg.train_params.save_every == 0 or (self.dice > self.best and
+                                                                      self.epoch % self.cfg.train_params.start_saving_best == 0):
+
                 self.save()
 
             gc.collect()
@@ -188,7 +210,11 @@ class Learner:
 
         # Update bn statistics for the swa_model at the end and save the model
         if self.epoch >= self.cfg.train_params.swa_start:
-            torch.optim.swa_utils.update_bn(self.data, self.swa_model)
+            # torch.optim.swa_utils.update_bn(self.data.to(device=self.device), self.swa_model)
+            for img, _ in self.data:
+                img = img.to(device=self.device)
+                self.swa_model(img)
+
             self.save(name=self.cfg.directory.model_name + "-final-swa")
 
         macs, params = op_counter(self.model, sample=img)
@@ -217,25 +243,25 @@ class Learner:
             loss = self.criterion(out, mask)
             running_loss.append(loss.item())
             # check dice score for last predicted frame
-            d_loss = class_dice(out[-1], mask[:, -1])
-            running_dice.append(d_loss)
+            d_loss = dice_score(out[:, -1], mask[:, -1])
+            running_dice.append(d_loss.cpu())
 
-        if self.epoch % self.cfg.train_params.save_every == 0:
-            # select a random sample to log
-            idx = np.random.randint(0, mask.size(0))
-            out_decoded = [
-                torch.from_numpy(decode_mask(ou.cpu())) for ou in out[:, idx, ...]
-            ]
-            out_decoded = torch.cat(out_decoded, dim=-1)  # cat widths
-            mask_decoded = [
-                torch.from_numpy(decode_mask(ma.cpu())) for ma in mask[idx, ...]
-            ]
-            mask_decoded = torch.cat(mask_decoded, dim=-1)  # cat widths
+        # if self.epoch % self.cfg.train_params.save_every == 0:
+        # select a random sample to log
+        idx = np.random.randint(0, mask.size(0))
+        out_decoded = [
+            torch.from_numpy(decode_mask(ou.cpu())) for ou in out[idx, ...]
+        ]
+        out_decoded = torch.cat(out_decoded, dim=-1)  # cat widths
+        mask_decoded = [
+            torch.from_numpy(decode_mask(ma.cpu())) for ma in mask[idx, ...]
+        ]
+        mask_decoded = torch.cat(mask_decoded, dim=-1)  # cat widths
 
-            log_image = torch.cat((mask_decoded, out_decoded), dim=-2)  # cat heights
-            self.logger.log_image(
-                log_image, name="val_sample_" + str(self.epoch), image_channels="first"
-            )
+        log_image = torch.cat((mask_decoded, out_decoded), dim=-2)  # cat heights
+        self.logger.log_image(
+            log_image, name=f"sample_{self.epoch:03}", image_channels="first", step=self.iteration
+        )
 
         # average loss
         loss = np.mean(running_loss)
@@ -247,6 +273,9 @@ class Learner:
             log_dice_class[key] = score
 
         self.logger.log_metrics(log_dice_class)
+        # clear memory
+        # if 'cuda' in self.cfg.train_params.device:
+        #     torch.cuda.empty_cache()
         # average all dices across all classes
         return loss, np.mean(dice)
 
@@ -256,7 +285,7 @@ class Learner:
 
         # First, let's see if we continue or start fresh:
         CONTINUE_RUN = cfg.resume
-        if EXPERIMENT_KEY is not None:
+        if EXPERIMENT_KEY and CONTINUE_RUN:
             # There is one, but the experiment might not exist yet:
             api = comet_ml.API()  # Assumes API key is set in config/env
             try:
@@ -293,12 +322,13 @@ class Learner:
             #    set COMET_EXPERIMENT_KEY, the experiment will get a
             #    random key!
             logger = comet_ml.Experiment(
-                disabled=True,
+                disabled=cfg.disabled,
                 project_name=cfg.project,
                 auto_histogram_weight_logging=True,
                 auto_histogram_gradient_logging=True,
                 auto_histogram_activation_logging=True,
             )
+            logger.set_name(cfg.experiment_name)
             logger.add_tags(cfg.tags.split())
             logger.log_parameters(self.cfg)
 
@@ -307,6 +337,7 @@ class Learner:
     def save(self, name=None):
         checkpoint = {
             "epoch": self.epoch,
+            "iteration": self.iteration,
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "lr_scheduler": self.lr_scheduler.state_dict(),
@@ -332,6 +363,6 @@ class Learner:
 
 
 if __name__ == "__main__":
-    cfg_path = "../conf/stage_1"
+    cfg_path = "PMoE/conf/stage_1"
     learner = Learner(cfg_path)
     learner.train()

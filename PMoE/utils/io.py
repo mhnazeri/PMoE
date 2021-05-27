@@ -28,7 +28,7 @@ def save_checkpoint(state: dict, is_best: bool, save_dir: str, name: str):
         print(f"Checkpoint Directory exists! Saving {name} in {save_dir}")
     torch.save(state, filepath)
     if is_best:
-        shutil.copyfile(filepath, os.path.join(save_dir, f"{name}-best.pth"))
+        shutil.copyfile(filepath, os.path.join(save_dir, f"{name.split('-')[0]}-best.pth"))
 
 
 def load_checkpoint(save: str, device: str):
