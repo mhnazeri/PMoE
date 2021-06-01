@@ -24,7 +24,7 @@ from thop import profile, clever_format
 from loss import moe_loss, punet_loss, pmoe_loss
 from model.moe import get_model
 from model.data_loader import CarlaSegPred
-from utils.nn import check_grad_norm, init_weights_normal, EarlyStopping, op_counter
+from utils.nn import check_grad_norm, EarlyStopping, op_counter
 from utils.vision import draw_on_image
 from utils.io import save_checkpoint, load_checkpoint, worker_init_fn
 from utils.utility import get_conf, timeit, class_labels
@@ -92,9 +92,10 @@ class Learner:
             self.model.load_state_dict(checkpoint["model"])
             self.optimizer.load_state_dict(checkpoint["optimizer"])
             self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
-            self.epoch = checkpoint["epoch"]
-            self.iteration = checkpoint["iteration"]
+            self.epoch = checkpoint["epoch"] + 1
+            self.iteration = checkpoint["iteration"] + 1
             self.logger.set_epoch(self.epoch)
+            self.logger.set_step(self.iteration)
             self.best = checkpoint["best"]
             self.e_loss = checkpoint["e_loss"]
             self.dice = checkpoint["dice"]
@@ -129,10 +130,10 @@ class Learner:
             self.model.train()
             np.random.seed()
             bar = tqdm(
-                enumerate(self.data),
-                desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}",
+                self.data,
+                desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}, training: ",
             )
-            for idx, (img, measurements) in bar:
+            for img, measurements in bar:
                 # move data to device
                 img = img.to(device=self.device)
                 # measurements = {'control', 'speed', 'target_speed', 'command'}
@@ -247,8 +248,8 @@ class Learner:
         self.model.eval()
         running_loss = []
 
-        for idx, (img, measurements) in tqdm(
-            enumerate(self.val_data), desc="Validation"
+        for img, measurements in tqdm(
+            self.val_data, desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}, validating: "
         ):
             # move data to device
             img = img.to(device=self.device)
@@ -370,6 +371,9 @@ class Learner:
 
 
 if __name__ == "__main__":
-    cfg_path = "PMoE/conf/stage_2"
+    if len(sys.argv) > 1:
+        cfg_path = sys.argv[-1]
+    else:
+        cfg_path = "PMoE/conf/stage_2"
     learner = Learner(cfg_path)
     learner.train()

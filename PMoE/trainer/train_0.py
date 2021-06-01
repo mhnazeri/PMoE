@@ -21,7 +21,7 @@ from torch.optim.swa_utils import AveragedModel, SWALR
 from loss import cross_entropy_tversky_weighted_loss, dice_score
 from model.blocks.unet import UNet
 from model.data_loader import CarlaSeg
-from utils.nn import check_grad_norm, init_weights_normal, EarlyStopping, op_counter
+from utils.nn import check_grad_norm, init_weights, EarlyStopping, op_counter
 from utils.vision import decode_mask
 from utils.io import save_checkpoint, load_checkpoint, worker_init_fn
 from utils.utility import get_conf, timeit, class_labels
@@ -52,7 +52,7 @@ class Learner:
         self.model = UNet(**self.cfg.model)
         if DEBUG:
             print(f"Model architecture:\n {self.model}")
-        self.model.apply(init_weights_normal)
+        self.model.apply(init_weights(**self.cfg.init_model))
         self.device = self.cfg.train_params.device
         self.model = self.model.to(device=self.device)
         if self.cfg.train_params.optimizer.lower() == "adam":
@@ -75,8 +75,10 @@ class Learner:
             self.model.load_state_dict(checkpoint["model"])
             self.optimizer.load_state_dict(checkpoint["optimizer"])
             self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
-            self.epoch = checkpoint["epoch"]
+            self.epoch = checkpoint["epoch"] + 1
+            self.iteration = checkpoint["iteration"] + 1
             self.logger.set_epoch(self.epoch)
+            self.logger.set_step(self.iteration)
             self.best = checkpoint["best"]
             self.e_loss = checkpoint["e_loss"]
             self.dice = checkpoint["dice"]
@@ -86,6 +88,7 @@ class Learner:
             )
         else:
             self.epoch = 1
+            self.iteration = 1
             self.best = -np.inf
             self.e_loss = []
 
@@ -109,10 +112,10 @@ class Learner:
             self.model.train()
             np.random.seed()  # reset seed
             bar = tqdm(
-                enumerate(self.data),
+                self.data,
                 desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}",
             )
-            for idx, (img, mask) in bar:
+            for img, mask in bar:
                 # move data to device
                 img = img.to(device=self.device)
                 mask = mask.to(device=self.device)
@@ -131,12 +134,14 @@ class Learner:
                 bar.set_postfix(loss=loss.item(), Grad_Norm=grad_norm)
                 self.logger.log_metrics(
                     {
-                        "epoch": self.epoch,
-                        "batch": idx,
                         "batch_loss": loss.item(),
                         "GradNorm": grad_norm,
-                    }
+                    },
+                    epoch=self.epoch,
+                    step=self.iteration
                 )
+
+                self.iteration += 1
             bar.close()
 
             if self.epoch >= self.cfg.train_params.swa_start:
@@ -162,12 +167,13 @@ class Learner:
             )
             self.logger.log_metrics(
                 {
-                    "epoch": self.epoch,
                     "epoch_loss": self.e_loss[-1],
                     "val_loss": val_loss[0],
                     "dice": val_loss[1],
                     "time": t,
-                }
+                },
+                epoch=self.epoch,
+                step=self.iteration
             )
 
             # early_stopping needs the validation loss to check if it has decreased,
@@ -208,7 +214,7 @@ class Learner:
         running_loss = []
         running_dice = []
 
-        for idx, (img, mask) in tqdm(enumerate(self.val_data), desc="Validation"):
+        for img, mask in tqdm(self.val_data, desc="Validation"):
             # move data to device
             img = img.to(device=self.device)
             mask = mask.to(device=self.device)
@@ -233,7 +239,8 @@ class Learner:
             mask_decoded = torch.from_numpy(decode_mask(gt.cpu()))
             log_image = torch.cat([image.cpu(), out_decoded, mask_decoded], dim=-1)
             self.logger.log_image(
-                log_image, name="sample_" + str(img_id), image_channels="first"
+                log_image, name="sample_" + str(img_id), image_channels="first",
+                step=self.iteration, context='test'
             )
 
         # average loss
@@ -245,7 +252,7 @@ class Learner:
         for key, score in zip(class_labels.values(), dice):
             log_dice_class[key] = score
 
-        self.logger.log_metrics(log_dice_class)
+        self.logger.log_metrics(log_dice_class, step=self.iteration)
         # average all dices across all classes
         return loss, np.mean(dice)
 
@@ -255,7 +262,7 @@ class Learner:
 
         # First, let's see if we continue or start fresh:
         CONTINUE_RUN = cfg.resume
-        if EXPERIMENT_KEY is not None:
+        if EXPERIMENT_KEY and CONTINUE_RUN:
             # There is one, but the experiment might not exist yet:
             api = comet_ml.API()  # Assumes API key is set in config/env
             try:
@@ -306,6 +313,7 @@ class Learner:
     def save(self, name=None):
         checkpoint = {
             "epoch": self.epoch,
+            "iteration": self.iteration,
             "unet": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "lr_scheduler": self.lr_scheduler.state_dict(),

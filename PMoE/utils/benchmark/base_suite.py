@@ -8,7 +8,7 @@ try:
 except IndexError as e:
     pass
 
-import carla_utils as cu
+import utils.carla_utils as cu
 
 
 class BaseSuite(cu.CarlaWrapper):

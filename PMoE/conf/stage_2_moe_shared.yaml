@@ -14,7 +14,7 @@ train_params:
 # Logger parameters
 logger:
   project: "PMoE" # project name or workspace
-  experiment_name: 'MoE_ALT'
+  experiment_name: 'MoE_SHARED'
   tags: "action moe stage_2"
   resume: False # (boolean) whether to resume training or not
   experiment_key: None # can be retrieved from logger dashboard, available if only resuming
@@ -24,7 +24,7 @@ logger:
 # Dataloader parameters
 dataloader:
   num_workers: 8
-  batch_size: 64
+  batch_size: 128
   shuffle: True # whether to shuffle data or not
   pin_memory: True # directly load datasets as CUDA tensors
 
@@ -36,7 +36,7 @@ dataset:
   aug_type: "super_hard" # which type of augmentation to use
   seed: 42 # random seed for choosing validation folders
   load_measurements: True # if you want to load measurements as label
-  batch_size: 64 # batch size, should be the same as dataloader batch_size
+  batch_size: 128 # batch size, should be the same as dataloader batch_size
   boost: 1 # boost the chance of applying augmentation
   crop:
     - 125 # crop from the top (remove ski)
@@ -55,7 +55,7 @@ val_dataset:
   aug_type: "super_hard" # which type of augmentation to use
   seed: 42 # random seed for choosing validation folders
   load_measurements: True # if you want to load measurements as label
-  batch_size: 64 # batch size, should be the same as dataloader batch_size
+  batch_size: 128 # batch size, should be the same as dataloader batch_size
   boost: 1 # boost the chance of applying augmentation
   crop:
     - 125 # crop from the top (remove ski)
@@ -68,14 +68,14 @@ val_dataset:
 
 # directories
 directory:
-  model_name: "MoE_ALT"
+  model_name: "MoE_SHARED"
   save: "PMoE/checkpoint"
   load: "PMoE/checkpoint/MoE-best.pt"
 
 # model parameters
 model:
   verbose: True # show some statistics about model parameters or not
-  type: 'moe_alt' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained
+  type: 'moe_shared' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained
   n_experts: 3 # number of experts to be used
   loss_coefs: [ 0.7, 0.3 ] # Coefficients for loss function. [BC_NLL, Speed_Loss]
   exclude_freeze: [ ] # a list of layers to stay unfrozen

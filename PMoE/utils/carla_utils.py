@@ -384,10 +384,11 @@ class CarlaWrapper(object):
 
         self._client.set_timeout(30.0)
 
-        set_sync_mode(self._client, False)
+        set_sync_mode(self._client, True)
 
         self._town_name = town
         self._world = self._client.load_world(town)
+        self._world.set_pedestrians_cross_factor(0.1)
         self._map = self._world.get_map()
 
         self._blueprints = self._world.get_blueprint_library()
@@ -453,7 +454,7 @@ class CarlaWrapper(object):
                 )
 
             vehicle.set_autopilot(True)
-            vehicle.start_dtcrowd()
+            # vehicle.start_dtcrowd()
 
             self._actor_dict["vehicle"].append(vehicle)
 
@@ -570,7 +571,7 @@ class CarlaWrapper(object):
     def spawn_player(self):
         self._player = self._world.spawn_actor(self._vehicle_bp, self._start_pose)
         self._player.set_autopilot(False)
-        self._player.start_dtcrowd()
+        # self._player.start_dtcrowd()
         self._actor_dict["player"].append(self._player)
 
     def ready(self, ticks=50):
@@ -640,8 +641,8 @@ class CarlaWrapper(object):
 
     def clean_up(self):
         for vehicle in self._actor_dict["vehicle"]:
-            # continue
-            vehicle.stop_dtcrowd()
+            continue
+            # vehicle.stop_dtcrowd()
 
         for controller in self._actor_dict["ped_controller"]:
             controller.stop()
@@ -660,8 +661,8 @@ class CarlaWrapper(object):
         self._tick = 0
         self._time_start = time.time()
 
-        if self._player:
-            self._player.stop_dtcrowd()
+        # if self._player:
+        #     self._player.stop_dtcrowd()
         self._player = None
 
         # Clean-up cameras

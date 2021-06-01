@@ -47,7 +47,7 @@ run () {
       python PMoE/trainer/train_1.py
       ;;
     stage2)
-      python PMoE/trainer/train_2.py
+      python PMoE/trainer/train_2.py $2
       ;;
     stage3)
       python PMoE/trainer/train_3.py
@@ -80,6 +80,6 @@ run () {
   esac
 }
 
-run $1
+run $1 $2
 
 echo "Done."

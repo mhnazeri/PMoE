@@ -1,6 +1,6 @@
 # Training parameters
 train_params:
-  epochs: 80
+  epochs: 82
   device: "cuda:0" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
   optimizer: "adam"
   save_every: 10
@@ -8,7 +8,7 @@ train_params:
   patience: 5 # how many epochs we want to wait after the last time the validation loss improved before breaking the training loop
   early_stopping_delta: 0
   early_stopping: False
-  grad_clipping: 1.0
+  grad_clipping: 0.0
   loss_type: "tversky" # which loss to use. Valid losses are l1, l2, tversky
   start_saving_best: 10 # start epoch of saving best model
 
@@ -69,7 +69,7 @@ val_dataset:
 directory:
   model_name: "punet" # use this name to same checkpoint
   save: "PMoE/checkpoint"
-  load: "PMoE/checkpoint/punet-e60.pth"
+  load: "PMoE/checkpoint/punet-e80.pth"
 
 # model parameters
 model:

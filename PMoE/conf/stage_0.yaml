@@ -50,6 +50,17 @@ val_dataset:
     - 224 # height
     - 224 # width
 
+# model initializer
+init_model:
+  method: "kaiming_normal" # kaiming_normal, kaiming_uniform, normal, uniform, xavier_normal, xavier_uniform
+  mean: 0.0 # mean of normal distribution
+  std: 0.5 # standard deviation for normal distribution
+  low: 0.0 # minimum threshold for uniform distribution
+  high: 1.0 # maximum threshold for uniform distribution
+  mode: "fan_in" # either 'fan_in' (default) or 'fan_out'. Choosing 'fan_in' preserves the magnitude of the variance of the weights in the forward pass. Choosing 'fan_out' preserves the magnitudes in the backwards pass.
+  nonlinearity: "leaky_relu" # the non-linear function (nn.functional name), recommended to use only with 'relu' or 'leaky_relu' (default).
+  gain: 1.0 # an optional scaling factor for xavier initialization
+
 # directories
 directory:
   model_name: "unet"

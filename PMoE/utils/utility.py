@@ -12,7 +12,7 @@ def get_conf(name: str):
     Args:
         name: (str) name of the yaml file without .yaml extension
     """
-    name = name if name.split(".")[-1] == ".yaml" else name + ".yaml"
+    name = name if name.split(".")[-1] == "yaml" else name + ".yaml"
     cfg = OmegaConf.load(name)
     return cfg
 

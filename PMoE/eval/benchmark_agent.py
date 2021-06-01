@@ -1,4 +1,7 @@
 """source: https://github.com/dotchen/LearningByCheating"""
+import torch
+import torchvision
+
 import time
 
 from pathlib import Path
@@ -32,10 +35,13 @@ def _agent_factory_hack(config):
 
     if config.model.type == "rl_agent":
         model = Actor(config.model)
+        model = model.to(device=config.model.device)
     else:
-        model = get_model(config.model)
+        model = get_model(config.model.actor)
         state_dict = torch.load(config.model.model_dir)
         model.load_state_dict(state_dict["model"])
+        model.choose_action = model.sample
+        model = model.to(device=config.model.device)
 
     model.eval()
 
@@ -55,7 +61,7 @@ def run(config):
         benchmark_dir.mkdir(parents=True, exist_ok=True)
 
         with make_suite(
-            suite_name, port=config.env.port, big_cam=config.env.big_cam
+            suite_name, port=config.env.port#, big_cam=config.env.big_cam
         ) as env:
             agent_maker = _agent_factory_hack(config)
 
@@ -64,10 +70,11 @@ def run(config):
                 env,
                 benchmark_dir,
                 config.env.seed,
-                config.env.autopilot,
+                # config.env.autopilot,
                 config.env.resume,
-                max_run=config.env.max_run,
-                show=config.env.show,
+                config,
+                config.env.max_run,
+                # show=config.env.show,
             )
 
         elapsed = time.time() - tick
@@ -79,5 +86,5 @@ def run(config):
 
 
 if __name__ == "__main__":
-    config = get_conf("../conf/benchmark.yaml")
+    config = get_conf("PMoE/conf/benchmark")
     run(config)

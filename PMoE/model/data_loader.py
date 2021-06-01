@@ -229,7 +229,9 @@ class CarlaSegPred(Dataset):
             measurements["target_speed"] / self.speed_factor, dtype=torch.float
         )
         command = torch.zeros(self.n_commands).scatter_(
-            dim=0, index=torch.tensor(measurements["command"] - 1), value=1
+            dim=0,
+            index=torch.tensor(measurements["command"] - 1, dtype=torch.long),
+            value=1
         )
         # convert throttle and brake into a single action space in range [-1, 1]
         if brake > 0.05:

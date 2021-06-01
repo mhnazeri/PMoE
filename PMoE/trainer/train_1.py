@@ -20,7 +20,7 @@ from torch.optim.swa_utils import AveragedModel, SWALR
 from loss import AutoregressiveCriterion, dice_score
 from model.punet import PredictiveUnet
 from model.data_loader import CarlaSegPred
-from utils.nn import check_grad_norm, init_weights_normal, EarlyStopping, op_counter
+from utils.nn import check_grad_norm, EarlyStopping, op_counter
 from utils.vision import decode_mask
 from utils.io import save_checkpoint, load_checkpoint, worker_init_fn
 from utils.utility import get_conf, timeit, class_labels
@@ -51,7 +51,7 @@ class Learner:
         self.model = PredictiveUnet(**self.cfg.model)
         if DEBUG:
             print(f"Model architecture:\n {self.model}")
-        # self.model.apply(init_weights_normal)
+
         self.device = self.cfg.train_params.device
         self.model = self.model.to(device=self.device)
 
@@ -84,9 +84,10 @@ class Learner:
             self.model.load_state_dict(checkpoint["model"])
             self.optimizer.load_state_dict(checkpoint["optimizer"])
             self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
-            self.epoch = checkpoint["epoch"]
-            self.iteration = checkpoint["iteration"]
+            self.epoch = checkpoint["epoch"] + 1
+            self.iteration = checkpoint["iteration"] + 1
             self.logger.set_epoch(self.epoch)
+            self.logger.set_step(self.iteration)
             self.best = checkpoint["best"]
             self.e_loss = checkpoint["e_loss"]
             self.dice = checkpoint["dice"]
@@ -122,10 +123,10 @@ class Learner:
             self.model.train()
             np.random.seed()  # reset seed
             bar = tqdm(
-                enumerate(self.data),
-                desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}",
+                self.data,
+                desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}, training: ",
             )
-            for idx, (img, mask) in bar:
+            for img, mask in bar:
                 # move data to device
                 img = img.to(device=self.device)
                 mask = mask.to(device=self.device)
@@ -167,8 +168,6 @@ class Learner:
             else:
                 self.lr_scheduler.step()
 
-            # if 'cuda' in self.cfg.train_params.device:
-            #     torch.cuda.empty_cache()
             # validate on val set
             val_loss, t = self.validate()
             t /= len(self.val_dataset)  # time is calculated over the whole val_data
@@ -217,6 +216,10 @@ class Learner:
 
             self.save(name=self.cfg.directory.model_name + "-final-swa")
 
+
+        if self.epoch == self.cfg.train_params.epochs:
+            self.save()
+
         macs, params = op_counter(self.model, sample=img)
         print(macs, params)
         self.logger.log_metrics({"GFLOPS": macs[:-1], "#Params": params[:-1]})
@@ -229,7 +232,7 @@ class Learner:
         running_loss = []
         running_dice = []
 
-        for idx, (img, mask) in tqdm(enumerate(self.val_data), desc="Validation"):
+        for img, mask in tqdm(self.val_data, desc=f"Epoch {self.epoch}/{self.cfg.train_params.epochs}, validating: "):
             # move data to device
             img = img.to(device=self.device)
             mask = mask.to(device=self.device)

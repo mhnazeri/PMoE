@@ -1,4 +1,4 @@
-from goal_suite import PointGoalSuite
+from .goal_suite import PointGoalSuite
 
 
 VERSION = "096"

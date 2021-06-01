@@ -247,20 +247,27 @@ class MixtureOfExpertsShared(nn.Module):
     def sample(
         self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor
     ) -> torch.Tensor:
-        out = [moe(images, speed, command) for moe in self.moe]
-        alphas, mean, std = [], [], []
-        for expert in out:
-            alphas.append(expert[0])
-            mean.append(expert[1])
-            std.append(expert[2])
-
-        alphas = torch.cat(alphas, dim=1)
-        alphas = F.softmax(alphas, dim=1)
-        mean = torch.stack(mean, dim=1)
-        std = torch.stack(std, dim=1)
-        mixtures = D.Categorical(alphas)
+        speed = self.speed_encoder(speed)
+        command = self.command_encoder(command)
+        images = images.view(
+            images.shape[0], -1, images.shape[-2], images.shape[-1]
+        )  # cat along time dimension
+        img = self.backbone(images)
+        # concat features along the last dim to produce tensor (B, 3 * 512)
+        features = torch.cat([img, speed, command], dim=-1)
+        action_features = self.action_features(features)
+        # calculate mean and std
+        mean, std = (
+            self.action_pred(action_features)
+            .view(speed.shape[0], self.n_experts, -1)
+            .split(2, dim=-1)
+        )
+        std = F.elu(std) + 1
+        alpha = F.softmax(self.alpha(action_features), dim=1)
+        # mixture coefficients
+        mixture = D.Categorical(alpha)
         components = D.Independent(D.Normal(mean, std), 1)
-        actions = D.MixtureSameFamily(mixtures, components)
+        actions = D.MixtureSameFamily(mixture, components)
         return actions.sample()
 
 

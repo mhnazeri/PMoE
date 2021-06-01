@@ -17,31 +17,34 @@ import pandas as pd
 import torch
 from torchvision import transforms
 
-import carla_utils as cu
+import utils.carla_utils as cu
 from model.augmenter import Crop
 
 
 def postprocess(action: torch.Tensor):
     control = carla.VehicleControl()
-    control.steer = torch.clip(action[0], -1.0, 1.0).cpu().numpy()
+    # print(f"{action = }")
+    control.steer = torch.clip(action[0], -1.0, 1.0).item()
     if action[1] > 0.05:
-        control.throttle = torch.clip(action[1], 0.0, 0.75).cpu().numpy()
+        control.throttle = torch.clip(action[1], 0.0, 0.75).item()#.cpu().numpy()
         control.brake = 0
     else:
         control.throttle = 0
-        control.brake = -torch.clip(action[1], 0.0, 1.0).cpu().numpy()
+        control.brake = -torch.clip(action[1], 0.0, 1.0).item()#.cpu().numpy()
 
     control.manual_gear_shift = False
 
     return control
 
 
-def run_single(env, weather, start, target, agent_maker, seed):
+@torch.no_grad()
+def run_single(env, weather, start, target, agent_maker, seed, config):
     # HACK: deterministic vehicle spawns.
     env.seed = seed
     env.init(start=start, target=target, weather=cu.PRESET_WEATHERS[weather])
 
     agent = agent_maker
+    device = config.device
 
     diagnostics = list()
     result = {
@@ -69,31 +72,24 @@ def run_single(env, weather, start, target, agent_maker, seed):
 
         observations = env.get_observations()
         rgb = transform(observations["rgb"].copy())
-        img_list.append(rgb)
-        speed = (
-            torch.tensor(
-                np.linalg.norm(observations["velocity"]) / 10, dtype=torch.float
-            )
-            .unsqueeze_(0)
-            .to(agent.device)
-        )
-        _cmd = int(observations["command"])
-        command = (
-            torch.zeros(4)
-            .scatter_(
+        img_list.append(rgb.to(device))
+        speed = torch.tensor(
+                [np.linalg.norm(observations["velocity"]) / 10.0,], dtype=torch.float
+            ).unsqueeze_(0)
+        # )
+        # _cmd = int(observations["command"])
+        command = torch.zeros(config.env.n_commands).scatter_(
                 dim=0, index=torch.tensor(int(observations["command"]) - 1), value=1
-            )
-            .unsqueeze_(0)
-            .to(agent.device)
-        )
-        images = (
-            torch.tensor(torch.stack(list(img_list), dim=0))
-            .unsqueeze_(0)
-            .to(agent.device)
-        )
+            ).unsqueeze_(0)
+            # .to(device)
+        # )
+        images = torch.stack(list(img_list), dim=0).unsqueeze_(0)
+            # .to(device)
+        # )
+        # print(f"{images.shape = }, {speed.shape = }, {command.shape = }")
 
-        action = agent.choose_action(images, speed, command)
-        control = postprocess(action)
+        action = agent.choose_action(images.to(device), speed.to(device), command.to(device))
+        control = postprocess(action.squeeze())
         diagnostic = env.apply_control(control)
 
         diagnostic.pop("viz_img")
@@ -110,12 +106,12 @@ def run_single(env, weather, start, target, agent_maker, seed):
     return result, diagnostics
 
 
-def run_benchmark(agent_maker, env, benchmark_dir, seed, resume, max_run=5):
+def run_benchmark(agent_maker, env, benchmark_dir, seed, resume, config, max_run=5):
     """
     benchmark_dir must be an instance of pathlib.Path
     """
-    summary_csv = benchmark_dir / "summary.csv"
-    diagnostics_dir = benchmark_dir / "diagnostics"
+    summary_csv = benchmark_dir / f"summary_{config.model.actor.type}.csv"
+    diagnostics_dir = benchmark_dir / f"diagnostics_{config.model.actor.type}"
     diagnostics_dir.mkdir(parents=True, exist_ok=True)
 
     summary = list()
@@ -143,7 +139,7 @@ def run_benchmark(agent_maker, env, benchmark_dir, seed, resume, max_run=5):
 
         diagnostics_csv = str(diagnostics_dir / ("%s.csv" % run_name))
 
-        result, diagnostics = run_single(env, weather, start, target, agent_maker, seed)
+        result, diagnostics = run_single(env, weather, start, target, agent_maker, seed, config)
 
         summary = summary.append(result, ignore_index=True)
 
