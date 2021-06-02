@@ -4,9 +4,9 @@ export PYTHONPATH=$PYTHONPATH:$CARLA_ROOT/PythonAPI/carla
 export PYTHONPATH=$PYTHONPATH:$CARLA_ROOT/PythonAPI/carla/dist/carla-0.9.10-py3.7-linux-x86_64.egg
 export PYTHONPATH=$PYTHONPATH:$CARLA_ROOT/PythonAPI/carla/agents
 export PYTHONPATH=$PYTHONPATH:PMoE
-export PYTHONPATH=$PYTHONPATH:leaderboard
-export PYTHONPATH=$PYTHONPATH:leaderboard/team_code
-export PYTHONPATH=$PYTHONPATH:scenario_runner
+export PYTHONPATH=$PYTHONPATH:PMoE/leaderboard
+#export PYTHONPATH=$PYTHONPATH:leaderboard/team_code
+export PYTHONPATH=$PYTHONPATH:PMoE/scenario_runner
 
 
 export PORT=2000                                                    # change to port that CARLA is running
@@ -32,7 +32,8 @@ Help()
    echo "stage1         Starts training for stage 1, trains U-Net to predict future segmentation maps."
    echo "stage2         Starts training for stage 2, trains different models to output control commands."
    echo "stage3         Starts training for stage 3, refine models on driving task itself. This stage requires Carla."
-   echo "benchmark      Benchmark agent against CORL 2017 and NoCrash benchmarks."
+   echo "benchmark      Benchmark agent against CORL 2017 benchmarks"
+   echo "nocrash        Benchmark agent against NoCrash benchmark."
    echo "view_benchmark Print benchmark results."   
    echo "leaderboard    Benchmark agent against Carla leaderboard."
    echo
@@ -53,7 +54,10 @@ run () {
       python PMoE/trainer/train_3.py
       ;;
     benchmark)
-      python PMoE/eval/benchmark_agent.py
+      python PMoE/eval/evaluate.py
+      ;;
+    nocrash)
+      python PMoE/eval/evaluate_nocrash.py
       ;;
     view_benchmark)
       python PMoE/eval/view_benchmark_results.py

@@ -1,15 +1,20 @@
 # Environment Config
 env:
-  host: 'localhost'
+  host: 'localhost' # IP of the host server (default: localhost)'
   port: 2000
-  suite: 'town1' # choices=ALL_SUITES
-  big_cam: True
+  trafficManagerSeed: 0 # Seed used by the TrafficManager (default: 0)
+  timeout: 60.0 # Set the CARLA client timeout value in seconds
+  repetitions: 1 # Number of repetitions per route.
+  track: 'SENSORS' # Participation track: SENSORS, MAP
+  checkpoint: './simulation_results.json' # Path to checkpoint used for saving statistics and resuming
+#  suite: 'town1' # choices=ALL_SUITES
+#  big_cam: True
   seed: 2021
-  autopilot: False
-  show: False
-  max_run: 1
-  show_preview: False # whether or not we want to show a preview
-  resume: False
+#  autopilot: False
+#  show: False
+#  max_run: 1
+#  show_preview: False # whether or not we want to show a preview
+  resume: False # Resume execution from last checkpoint?
   img_width: 800
   img_height: 600
   fov: '100'
@@ -20,19 +25,20 @@ env:
 
 # Logger parameters
 logger:
-  # project: "PMoE" # project name or workspace
-  # tags: "stage_3 action"
-  # resume: False # (boolean) whether to resume training or not
-  # experiment_key: None # can be retrieved from logger dashboard, available if only resuming
+   project: "PMoE" # project name or workspace
+   tags: "benchmark NoCrash"
+   resume: False # (boolean) whether to resume training or not
+   experiment_key: None # can be retrieved from logger dashboard, available if only resuming
   log_dir: "PMoE/logs" # where to store log data
 
 # model parameters
 model:
   # type: 'moe' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained, rl_agent
-  device: "cpu" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
-  model_dir: "PMoE/checkpoint/MoE-best.pth" # pretrained model directory, it cannot be None
-  exclude_freeze: ['something',] # a list of layers to stay unfrozen
   actor:
+    n_commands: 6
+    device: "cpu" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
+    model_dir: "PMoE/checkpoint/MoE-best.pth" # pretrained model directory, it cannot be None
+    exclude_freeze: ['something',] # a list of layers to stay unfrozen
     # lr: 0.00001 # learning rate
     n_experts: 3 # number of experts to be used
     # exclude_freeze: [ 'model_weights', 'alpha' ] # a list of layers to stay unfrozen
@@ -133,28 +139,3 @@ model:
       l_act: False # use activation function on the last layer or just return scores/logits?
       bn: False # use batchnorm?
       dropout: 0.3
-
-# Adam parameters if using Adam optimizer
-# adam:
-#   lr: 1e-3
-#   betas:
-#     - 0.9
-#     - 0.999
-#   eps: 1e-8
-#   weight_decay: 0
-#   amsgrad: False
-
-# # RMSprop parameters if using RMSprop optimizer
-# rmsprop:
-#   lr: 1e-3
-#   momentum: 0
-#   alpha: 0.99
-#   eps: 1e-8
-#   centered: True
-#   weight_decay: 0
-
-# # Stochastic Weight Averaging parameters
-# SWA:
-#   anneal_strategy: "linear"
-#   anneal_epochs: 5
-#   swa_lr: 0.05
