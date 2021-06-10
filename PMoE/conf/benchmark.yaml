@@ -15,21 +15,27 @@ env:
 #  max_run: 1
 #  show_preview: False # whether or not we want to show a preview
   resume: False # Resume execution from last checkpoint?
-  img_width: 800
-  img_height: 600
-  fov: '100'
   n_vehicles: 100  # The range for the random numbers that are going to be generated
   n_pedestrians: 250
-  n_commands: 6
+  # n_commands: 6
+
+sensors:
+  camera_x: 1.5
+  camera_z: 2.4
+  img_width: 800
+  img_height: 600
+  fov: 50
 
 
 # Logger parameters
 logger:
    project: "PMoE" # project name or workspace
+   disabled: False
+   experiment_name: "NoCrash"
    tags: "benchmark NoCrash"
    resume: False # (boolean) whether to resume training or not
    experiment_key: None # can be retrieved from logger dashboard, available if only resuming
-  log_dir: "PMoE/logs" # where to store log data
+   log_dir: "PMoE/logs" # where to store log data
 
 # model parameters
 model:

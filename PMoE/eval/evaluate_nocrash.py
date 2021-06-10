@@ -1,8 +1,9 @@
+from pathlib import Path
 import sys
 try:
     sys.path.append(str(Path("../").resolve()))
 except:
-    raise RuntimeError("Can't append root directory of the project the path")
+    raise RuntimeError("Can't append root directory of the project to the path")
 
 from runners import NoCrashEvalRunner
 # from utils.utility import get_conf
@@ -27,7 +28,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
     # Agent configs
-    parser.add_argument('--agent', default='autoagents/image_agent')
+    parser.add_argument('--agent', default='PMoE/autoagents/image_agent')
     parser.add_argument('--agent-config', default='PMoE/conf/benchmark.yaml')
     
     # Benchmark configs
@@ -52,7 +53,10 @@ if __name__ == '__main__':
     parser.add_argument("--checkpoint", type=str,
                         default='./simulation_results.json',
                         help="Path to checkpoint used for saving statistics and resuming")
-    
+    parser.add_argument("--log_dir", type=str,
+                        default='PMoE/benchmark_results/',
+                        help="Path to save benchmark results")
+
     args = parser.parse_args()
     # conf = get_conf("PMoE/conf/benchmark")
     main(args)

@@ -19,12 +19,12 @@ def check_grad_norm(net: nn.Module):
     return total_norm
 
 
-def freeze(model: nn.Module, exclude: List, verbose: bool = False) -> nn.Module:
+def freeze(model: nn.Module, exclude: List = [], verbose: bool = False) -> nn.Module:
     """Freezes the layers of the model except the exclusion layer list.
 
     Args:
         model: (nn.Module) The model itself.
-        exclude: (List) The list of layers name the you want to keep unfrozen.
+        exclude: (List) The list of layers name that you want to keep unfrozen.
         verbose: (bool) Show statistics of the model parameters.
 
     Returns:
@@ -35,6 +35,15 @@ def freeze(model: nn.Module, exclude: List, verbose: bool = False) -> nn.Module:
     if verbose:
         print(f"The model has {len([p for p in model.parameters()])} layers.")
         print(f"Before freezing the model had {sum(frozen_params_list)} parameters.")
+
+    if len(exclude) == 0 or exclude is None:
+        for name, child in model.named_parameters():
+            child.requires_grad_(False)
+
+        if verbose:
+            print(f"The whole model with {len([p for p in model.parameters()])} layers have been frozen.")
+
+        return model
 
     for name, child in model.named_parameters():
         if not any(layer in name for layer in exclude):

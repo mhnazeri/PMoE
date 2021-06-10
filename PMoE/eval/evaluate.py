@@ -8,7 +8,7 @@ from runners import ChallengeRunner
 from utils.utility import get_conf
 
 
-def main(args, conf):
+def main(args):
     scenario = 'assets/all_towns_traffic_scenarios.json'
     # scenario = 'assets/no_scenarios.json'
     # route = 'assets/routes_dev.xml'
@@ -16,7 +16,7 @@ def main(args, conf):
 
     args.agent = 'autoagents/image_agent'
     # args.agent = 'autoagents/collector_agents/lidar_q_collector'
-    args.agent_config = conf#'config.yaml'
+    args.agent_config = args.agent_config#'config.yaml'
     # args.agent_config = 'config_lidar.yaml'
 
     port = args.port
@@ -34,6 +34,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--host', default='localhost',
                         help='IP of the host server (default: localhost)')
+    parser.add_argument('--agent-config', default='PMoE/conf/benchmark.yaml')
     parser.add_argument('--trafficManagerSeed', default='0',
                         help='Seed used by the TrafficManager (default: 0)')
     parser.add_argument('--timeout', default="60.0",
@@ -52,5 +53,5 @@ if __name__ == '__main__':
                         help="Path to checkpoint used for saving statistics and resuming")
 
     args = parser.parse_args()
-    conf = get_conf("PMoE/conf/benchmark")
-    main(args, conf)
+    # conf = get_conf("PMoE/conf/benchmark")
+    main(args)

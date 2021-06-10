@@ -85,7 +85,7 @@ def decode_mask(mask, nc: int = 23):
     return rgb
 
 
-def draw_on_image(img, measurements, action):
+def draw_on_image(img, measurements, action, gt = True):
     """Draw text on the image
 
     Args:
@@ -93,18 +93,10 @@ def draw_on_image(img, measurements, action):
         measurements: (dict) ground truth values
         action: (torch.Tensor) predicted actions
     """
+    # if measurements:
     control = measurements["control"]
     speed = measurements["speed"]
     command = measurements["command"]
-    steer = action[0].item()
-    pedal = action[1].item()
-    if pedal > 0:
-        throttle = pedal
-        brake = 0
-    else:
-        throttle = 0
-        brake = -pedal
-
     steer_gt = control[0]
     pedal_gt = control[1]
     if pedal_gt > 0:
@@ -114,6 +106,16 @@ def draw_on_image(img, measurements, action):
         throttle_gt = 0
         brake_gt = -pedal_gt
 
+    steer = action[0].item()
+    pedal = action[1].item()
+    if pedal > 0:
+        throttle = pedal
+        brake = 0
+    else:
+        throttle = 0
+        brake = -pedal
+
+
     img = img.permute(1, 2, 0).numpy()
     img_width = img.shape[1] // 2
     img = Image.fromarray(
@@ -122,7 +124,6 @@ def draw_on_image(img, measurements, action):
     draw = ImageDraw.Draw(img)
     # load font
     fnt = ImageFont.truetype("PMoE/misc_files/FUTURAM.ttf", 11)
-    draw.text((5, 10), "Speed: %.3f" % speed, fill=(0, 255, 0, 255), font=fnt)
     draw.text((5, 30), "Steer: %.3f" % steer, fill=(255, 0, 0, 255), font=fnt)
     draw.text((5, 50), "Throttle: %.3f" % throttle, fill=(255, 0, 0, 255), font=fnt)
     draw.text((5, 70), "Brake: %.3f" % brake, fill=(255, 0, 0, 255), font=fnt)
@@ -133,18 +134,20 @@ def draw_on_image(img, measurements, action):
         fill=(0, 255, 0, 255),
         font=fnt,
     )
-    draw.text(
-        (img_width, 30), "Steer (GT): %.3f" % steer_gt, fill=(0, 255, 0, 255), font=fnt
-    )
-    draw.text(
-        (img_width, 50),
-        "Throttle (GT): %.3f" % throttle_gt,
-        fill=(0, 255, 0, 255),
-        font=fnt,
-    )
-    draw.text(
-        (img_width, 70), "Brake (GT): %.3f" % brake_gt, fill=(0, 255, 0, 255), font=fnt
-    )
+    if gt:
+        draw.text((5, 10), "Speed: %.3f" % speed, fill=(0, 255, 0, 255), font=fnt)
+        draw.text(
+            (img_width, 30), "Steer: %.3f" % steer_gt, fill=(0, 255, 0, 255), font=fnt
+        )
+        draw.text(
+            (img_width, 50),
+            "Throttle: %.3f" % throttle_gt,
+            fill=(0, 255, 0, 255),
+            font=fnt,
+        )
+        draw.text(
+            (img_width, 70), "Brake: %.3f" % brake_gt, fill=(0, 255, 0, 255), font=fnt
+        )
 
     return np.array(img)
 

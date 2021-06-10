@@ -1,0 +1,159 @@
+# Training parameters
+train_params:
+  epochs: 50
+  device: "cuda:0" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
+  optimizer: "adam"
+  save_every: 10
+  swa_start: 125 # start epoch of stochastic weight averaging
+  patience: 3 # how many epochs we want to wait after the last time the validation loss improved before breaking the training loop
+  early_stopping_delta: 0
+  early_stopping: False
+  grad_clipping: 1.0
+  start_saving_best: 10 # start epoch of saving best model
+
+# Logger parameters
+logger:
+  project: "PMoE" # project name or workspace
+  experiment_name: 'PUNet-Inter-Action'
+  tags: "action punet stage_2"
+  resume: False # (boolean) whether to resume training or not
+  experiment_key: None # can be retrieved from logger dashboard, available if only resuming
+  log_dir: "./logs" # where to store log data
+  disabled: False # disable the comet ml
+
+# Dataloader parameters
+dataloader:
+  num_workers: 8
+  batch_size: 8
+  shuffle: True # whether to shuffle data or not
+  pin_memory: True # directly load datasets as CUDA tensors
+
+# Train dataset parameters
+dataset:
+  root: "PMoE/data/train" # where data resides, relative to dataloader path
+  past_frames: 4 # number of past frames to use as input
+  future_frames: 6 # number of future frames as ground truths
+  aug_type: "super_hard" # which type of augmentation to use
+  seed: 42 # random seed for choosing validation folders
+  load_measurements: True # if you want to load measurements as label
+  batch_size: 8 # batch size, should be the same as dataloader batch_size
+  boost: 1 # boost the chance of applying augmentation
+  crop:
+    - 125 # crop from the top (remove ski)
+    - 90  # crop from the bottom (remove hood)
+  resize:
+    - 224 # height
+    - 224 # width
+  n_commands: 6 # number of navigational commands
+  speed_factor: 10 # normalize the speed
+
+# Test dataset parameters
+val_dataset:
+  root: "PMoE/data/test" # where data resides, relative to dataloader path
+  past_frames: 4 # number of past frames to use as input
+  future_frames: 6 # number of future frames as ground truths
+  aug_type: "super_hard" # which type of augmentation to use
+  seed: 42 # random seed for choosing validation folders
+  load_measurements: True # if you want to load measurements as label
+  batch_size: 8 # batch size, should be the same as dataloader batch_size
+  boost: 1 # boost the chance of applying augmentation
+  crop:
+    - 125 # crop from the top (remove ski)
+    - 90  # crop from the bottom (remove hood)
+  resize:
+    - 224 # height
+    - 224 # width
+  n_commands: 6 # number of navigational commands
+  speed_factor: 10 # normalize the speed
+
+# directories
+directory:
+  model_name: "PUNet_Action_Inter"
+  save: "PMoE/checkpoint"
+  load: "PMoE/checkpoint/PUNet_Action_Inter.pth"
+
+# model parameters
+model:
+  verbose: True # show some statistics about model parameters or not
+  type: 'punet' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained
+  n_experts: 3 # number of experts to be used
+  loss_coefs: [ 0.7, 0.3 ] # Coefficients for loss function. [BC_NLL, Speed_Loss]
+  exclude_freeze: [ ] # a list of layers to stay unfrozen
+  punet_path: "PMoE/checkpoint/punet-e80.pth"
+  action_head: # speed encoder network, just an MLP
+    dims: [ 1536, 512, 512 ] # MLP dimensions. First dim should always be 1536
+    act: 'elu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+    l_act: True # use activation function on the last layer or just return scores/logits?
+    bn: False # use batchnorm?
+    dropout: 0.3
+  speed_encoder: # speed encoder network, just an MLP
+    dims: [ 1, 512, 512 ] # MLP dimensions. First dim should always be 1
+    act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+    l_act: False # use activation function on the last layer or just return scores/logits?
+    bn: False # use batchnorm?
+    dropout: 0.3
+  command_encoder: # command encoder network, just an MLP
+    dims: [ 6, 512, 512 ] # MLP dimensions. First dim should always be 4
+    act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+    l_act: False # use activation function on the last layer or just return scores/logits?
+    bn: False # use batchnorm?
+    dropout: 0.3
+  speed_prediction: # speed prediction head, just an MLP
+    dims: [ 1536, 512, 512, 1 ] # MLP dimensions. First dim should always be 1536
+    act: 'relu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
+    l_act: False # use activation function on the last layer or just return scores/logits?
+    bn: False # use batchnorm?
+    dropout: 0.3
+  backbone: # visual feature extractor
+    type: 'rgb' # valid values: rgb, segmentation
+    n_frames: 4 # number of input frames
+    rgb: # configs for resnet and mobilenet models
+      arch: 'resnet18' # valid values: resnet18/34/50, mobilenet_v2/3_small/large
+      pretrained: True
+      gamma: 2 # ECA gamma parameter
+      b: 1 # ECA b parameter
+    segmentation:
+      gamma: 2
+      b: 1
+      inter_repr: True # always true for this stage
+      model_dir: "PMoE/checkpoint/unet-best.pth"
+  punet:
+    past_frames: 4 # please note that data is captured at 2hz
+    future_frames: 6
+    in_features: 3
+    num_classes: 23 # number of segmentation classes, for carla 0.9.6+ it is 23
+    gamma: 2 # gamma parameter of eca module
+    b: 1 # b parameter of eca module
+    #inter_repr: False # whether PU-Net returns intermediate representation or not (not intended for training)
+    unet_inter_repr: False # whether U-Net returns intermediate representation or not (set to True if future_frames is 0)
+    model_name: "unet"
+    model_path: "PMoE/checkpoint/unet-best.pth"
+  pmoe:
+    moe_dir: "PMoE/checkpoint/MoE-best.pth" # MoE pretrained model directory, it cannot be None
+    punet_dir: "" # PU-Net pretrained model with actions directory
+
+
+# Adam parameters if using Adam optimizer
+adam:
+  lr: 2e-4
+  betas:
+    - 0.9
+    - 0.999
+  eps: 1e-8
+  weight_decay: 0
+  amsgrad: True
+
+# RMSprop parameters if using RMSprop optimizer
+rmsprop:
+  lr: 2e-4
+  momentum: 0
+  alpha: 0.99
+  eps: 1e-8
+  centered: True
+  weight_decay: 0
+
+# Stochastic Weight Averaging parameters
+SWA:
+  anneal_strategy: "linear"
+  anneal_epochs: 100
+  swa_lr: 0.0005

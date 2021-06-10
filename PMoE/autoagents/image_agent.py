@@ -1,6 +1,7 @@
 import os
 import math
 import sys
+from pathlib import Path
 from collections import deque
 
 try:
@@ -12,6 +13,8 @@ except:
 # import lmdb
 import comet_ml
 import numpy as np
+import cv2
+from PIL import Image
 import torch
 from torchvision import transforms
 import carla
@@ -23,10 +26,11 @@ import carla
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent, Track
 # from utils import visualize_obs
 from utils.vision import draw_on_image
+from utils.utility import get_conf
 from model.moe import get_model
 from model.rl_agent import Actor
 from model.augmenter import Crop
-from .waypointer import Waypointer
+from waypointer import Waypointer
 
 def get_entry_point():
     return 'ImageAgent'
@@ -44,7 +48,10 @@ class ImageAgent(AutonomousAgent):
 
         self.track = Track.SENSORS
         self.num_frames = 0
-        self.config = config
+        # self.config = get_conf(config)
+
+        if isinstance(config, str):
+            self.config = get_conf(config)
 
         # with open(path_to_conf_file, 'r') as f:
         #     config = yaml.safe_load(f)
@@ -52,25 +59,37 @@ class ImageAgent(AutonomousAgent):
         # for key, value in config.items():
         #     setattr(self, key, value)
 
-        self.device = torch.device(config.model.actor.device)
-        if config.type == "rl_agent":
-            self.model = Actor(config.model.actor)
-            self.model = self.model.to(device=config.model.actor.device)
+        self.device = torch.device(self.config.model.actor.device)
+        if self.config.model.actor.type == "rl_agent":
+            self.model = Actor(self.config.model.actor)
+            state_dict = torch.load(self.config.model.actor.model_dir)
+            self.model.load_state_dict(state_dict["actor"])
+            self.model = self.model.to(device=self.config.model.actor.device)
         else:
-            self.model = get_model(config.model.actor)
-            state_dict = torch.load(config.model.actor.model_dir)
+            self.model = get_model(self.config.model.actor)
+            state_dict = torch.load(self.config.model.actor.model_dir)
             self.model.load_state_dict(state_dict["model"])
             self.model.choose_action = self.model.sample
             self.model = self.model.to(device=self.device)
 
         self.model.eval()
-        self.img_list = deque([torch.zeros(3, 224, 224) for _ in range(config.actor.backbone.n_frames)],
-                              maxlen=config.actor.backbone.n_frames)
+        self.img_list = deque([torch.zeros(3, 224, 224, dtype=torch.float) for _ in range(self.config.model.actor.backbone.n_frames)],
+                              maxlen=self.config.model.actor.backbone.n_frames)
 
         self.vizs = []
 
         self.waypointer = None
-        self.logger = self.init_logger(config.logger)
+        self.logger = self.init_logger(self.config.logger)
+        # create a transform to crop the sky and resize images
+        self.transform = transforms.Compose(
+            [
+                # Crop([125, 90]),
+                Image.fromarray,
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+            ]
+        )
+        # print(f"{self.config}")
 
         # if self.log_wandb:
         #     wandb.init(project='carla_evaluate')
@@ -103,10 +122,16 @@ class ImageAgent(AutonomousAgent):
         #         'vid': wandb.Video(np.stack(self.vizs).transpose((0,3,1,2)), fps=20, format='mp4')
         #     })
         if self.logger:
-            log_image = torch.cat(self.viz, dim=-1)  # cat widths
-            self.logger.log_image(
-                log_image, image_channels="first", step=self.iteration
-            )
+            # log_image = torch.cat(self.viz, dim=-1)  # cat widths
+            out = cv2.VideoWriter('./log.avi', cv2.VideoWriter_fourcc(*'DIVX'), 20, (224, 224))
+            # self.logger.log_image(
+            #     log_image, image_channels="first", step=self.iteration
+            # )
+            for i in range(len(self.vizs)):
+                out.write(self.vizs[i])
+
+            out.release()
+            self.logger.log_asset("./log.avi")
             
         self.vizs.clear()
 
@@ -114,11 +139,13 @@ class ImageAgent(AutonomousAgent):
         sensors = [
             {'type': 'sensor.collision', 'id': 'COLLISION'},
             {'type': 'sensor.speedometer', 'id': 'EGO'},
-            {'type': 'sensor.other.gnss', 'x': 0., 'y': 0.0, 'z': self.camera_z, 'id': 'GPS'},
-            {'type': 'sensor.stitch_camera.rgb', 'x': self.camera_x, 'y': 0, 'z': self.camera_z, 'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0,
-            'width': 160, 'height': 240, 'fov': 60, 'id': f'Wide_RGB'},
-            {'type': 'sensor.camera.rgb', 'x': self.camera_x, 'y': 0, 'z': self.camera_z, 'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0,
-            'width': 384, 'height': 240, 'fov': 50, 'id': f'Narrow_RGB'},
+            {'type': 'sensor.other.gnss', 'x': 0., 'y': 0.0, 'z': self.config.sensors.camera_z, 'id': 'GPS'},
+            # {'type': 'sensor.stitch_camera.rgb', 'x': self.camera_x, 'y': 0, 'z': self.camera_z, 'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0,
+            # 'width': 160, 'height': 240, 'fov': 60, 'id': f'Wide_RGB'},
+            {'type': 'sensor.camera.rgb', 'x': self.config.sensors.camera_x,
+             'y': 0, 'z': self.config.sensors.camera_z, 'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0,
+             'width': self.config.sensors.img_width, 'height': self.config.sensors.img_height,
+             'fov': self.config.sensors.fov, 'id': f'Narrow_RGB'},
         ]
         
         return sensors
@@ -129,37 +156,35 @@ class ImageAgent(AutonomousAgent):
         control.steer = torch.clip(action[0], -1.0, 1.0).item()
         if action[1] < -0.5:
             control.throttle = 0
-            control.brake = -torch.clip(action[1], 0.0, 1.0).item()  # .cpu().numpy()
+            control.brake = torch.clip(-action[1], 0.0, 1.0).item()  # .cpu().numpy()
             control.steer = 0
         else:
             control.throttle = max(torch.clip(action[1], 0.0, 0.75).item(), 0.4)  # .cpu().numpy()
             control.brake = 0
 
-        control.manual_gear_shift = False
+        # control.manual_gear_shift = False
 
         return control
 
     def run_step(self, input_data, timestamp):
         
         # _, wide_rgb = input_data.get(f'Wide_RGB')
-        _, rgb = input_data.get(f'Narrow_RGB')
+        _, _rgb = input_data.get(f'Narrow_RGB')
 
         # # Crop images
         # _wide_rgb = wide_rgb[self.wide_crop_top:,:,:3]
-        rgb = rgb[...,:3]
+        rgb = _rgb[...,:3].copy()
+        rgb = rgb[..., ::-1] # BGR -> RGB
+        self.logger.log_image(rgb, f"before_{self.num_frames:05}")
 
-        # create a transform to crop the sky and resize images
-        transform = transforms.Compose(
-            [
-                Crop([125, 90]),
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-            ]
-        )
 
         # _wide_rgb = _wide_rgb[...,::-1].copy()
-        rgb = transform(rgb).copy()
+        rgb = self.transform(rgb)
+        # print(f"{rgb.shape = }")
+        # self.logger.log_image(rgb, f"after_{self.num_frames}", image_channels='First')
         self.img_list.append(rgb)
+        # log_i = torch.cat(list(self.img_list), dim=-1)
+        # self.logger.log_image(log_i.permute(1, 2, 0).cpu(), f"after_{self.num_frames:05}")
 
         _, ego = input_data.get('EGO')
         _, gps = input_data.get('GPS')
@@ -173,72 +198,45 @@ class ImageAgent(AutonomousAgent):
         spd = ego.get('spd')
         
         cmd_value = cmd.value-1
+        cmd_value = 3 if cmd_value < 0 else cmd_value
+        print(f"{spd = }, {cmd_value = }")
         speed = torch.tensor(
-            [spd / 10.0, ], dtype=torch.float
+            [spd, ], dtype=torch.float
         ).unsqueeze_(0).to(self.device)
         # )
         # _cmd = int(observations["command"])
-        command = torch.zeros(self.config.actor.n_commands).scatter_(
+        command = torch.zeros(self.config.model.actor.n_commands).scatter_(
             dim=0, index=torch.tensor(int(cmd_value)), value=1
         ).unsqueeze_(0).to(self.device)
         # )
         images = torch.stack(list(self.img_list), dim=0).unsqueeze_(0).to(self.device)
-        # cmd_value = 3 if cmd_value < 0 else cmd_value
-
-        # if cmd_value in [4,5]:
-        #     if self.lane_changed is not None and cmd_value != self.lane_changed:
-        #         self.lane_change_counter = 0
-        #
-        #     self.lane_change_counter += 1
-        #     self.lane_changed = cmd_value if self.lane_change_counter > {4:200,5:200}.get(cmd_value) else None
-        # else:
-        #     self.lane_change_counter = 0
-        #     self.lane_changed = None
-        #
-        # if cmd_value == self.lane_changed:
-        #     cmd_value = 3
-
-        # _wide_rgb = torch.tensor(_wide_rgb[None]).float().permute(0,3,1,2).to(self.device)
-        # _narr_rgb = torch.tensor(_narr_rgb[None]).float().permute(0,3,1,2).to(self.device)
-        
-        # if self.all_speeds:
-        #     steer_logits, throt_logits, brake_logits = self.image_model.policy(_wide_rgb, _narr_rgb, cmd_value)
-        #     # Interpolate logits
-        #     steer_logit = self._lerp(steer_logits, spd)
-        #     throt_logit = self._lerp(throt_logits, spd)
-        #     brake_logit = self._lerp(brake_logits, spd)
-        # else:
-        #     steer_logit, throt_logit, brake_logit = self.image_model.policy(_wide_rgb, _narr_rgb, cmd_value, spd=torch.tensor([spd]).float().to(self.device))
-
-        action = self.model.choose_action(images, speed, command)
-        control = self.postprocess(action.squeeze())
-        # action_prob = self.action_prob(steer_logit, throt_logit, brake_logit)
-        #
-        # brake_prob = float(action_prob[-1])
-        #
-        # steer = float(self.steers @ torch.softmax(steer_logit, dim=0))
-        # throt = float(self.throts @ torch.softmax(throt_logit, dim=0))
-        #
-        # steer, throt, brake = self.post_process(steer, throt, brake_prob, spd, cmd_value)
-
-        
-        # rgb = np.concatenate([wide_rgb, narr_rgb[...,:3]], axis=1)
-        
-        # self.vizs.append(visualize_obs(rgb, 0, (steer, throt, brake), spd, cmd=cmd_value+1))
+        action = self.model.choose_action(images, speed, command).squeeze()
+        control = self.postprocess(action)
+        print(f"{control}")
         measurements = {
             "control": [action[0], action[1]],
             "speed": speed,
             "command": command,
         }
+        control = carla.VehicleControl(steer=0, brake=0, throttle=1.0)
         log_image = draw_on_image(
-            rgb.cpu(), measurements, action.squeeze().cpu()
+            rgb.cpu(), measurements, action.cpu(), False
         )
+        self.logger.log_image(log_image, f"after_{self.num_frames:05}")
         self.vizs.append(log_image)
 
         if len(self.vizs) > 1000:
             self.flush_data()
 
         self.num_frames += 1
+
+        # if self.num_frames == 1:
+        # #     control = carla.VehicleControl()
+        # control = carla.VehicleControl(steer=0, brake=0, throttle=1.0)
+        # control.steer = 0.0
+        # control.brake = 0.0
+        # control.throttle = 1.0
+        print(f"{control}")
 
         return control
 
@@ -293,7 +291,7 @@ class ImageAgent(AutonomousAgent):
             )
             logger.set_name(cfg.experiment_name)
             logger.add_tags(cfg.tags.split())
-            logger.log_parameters(self.cfg)
+            logger.log_parameters(cfg)
 
         return logger
     

@@ -13,7 +13,7 @@ class NoCrashEvalRunner():
         args.port = port
         args.trafficManagerPort = tm_port
         args.debug = debug
-        args.record = ''
+        args.record = 'PMoE/benchmark_results'
         
         args.town = town
         args.weather = weather
@@ -45,7 +45,7 @@ class StatisticsManager:
             'Town02': {}
         }
         
-        logdir = args.agent_config.replace('.yaml', '.csv')
+        logdir = args.log_dir + args.town + "_" + args.weather + ".csv"
         
         if args.resume and os.path.exists(logdir):
             self.load(logdir)

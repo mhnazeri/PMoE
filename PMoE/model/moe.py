@@ -1,5 +1,5 @@
 """All the models that are used in the experiments:
-Mixture of Experts (MoE) with/out shared withs
+Mixture of Experts (MoE)(Alternative) with/out shared weights
 Predictive U-Net (PU-Net)
 Predictive Mixture of Experts (PMoE)
 """
@@ -283,7 +283,7 @@ class PUNetExpert(nn.Module):
         self.punet = PredictiveUnet(**params.punet)
         punet_weights = torch.load(params.punet_path)
         self.punet.load_state_dict(punet_weights["model"])
-        self.punet = freeze(self.punet, ['unet', 'entry_block', 'pred_unet'])
+        self.punet = freeze(self.punet)
         # use backbone if PU-Net does not return a vector as the result
         self.backbone = (
             None
@@ -358,7 +358,7 @@ class PMoE(nn.Module):
         moe_actions = dists.sample()
         actions = torch.cat([moe_actions, punet_actions], dim=-1)
         # -1 is just a dummy variable as speed prediction for the sake of interface consistency
-        return self.model_weights(actions), -1
+        return torch.tanh(self.model_weights(actions)), -1
 
     def sample(
         self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor

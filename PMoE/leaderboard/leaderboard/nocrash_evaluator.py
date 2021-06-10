@@ -366,7 +366,7 @@ class NoCrashEvaluator(object):
             # route_indexer.save_state(args.checkpoint)
 
         # Load routes
-        with open(f'runners/suite/nocrash_{args.town}.txt', 'r') as f:
+        with open(f'PMoE/runners/suite/nocrash_{args.town}.txt', 'r') as f:
             routes = [tuple(map(int, l.split())) for l in f.readlines()]
 
         weathers = {'train': [1,3,6,8], 'test': [10,14]}.get(args.weather)

@@ -7,19 +7,20 @@ export PYTHONPATH=$PYTHONPATH:PMoE
 export PYTHONPATH=$PYTHONPATH:PMoE/leaderboard
 #export PYTHONPATH=$PYTHONPATH:leaderboard/team_code
 export PYTHONPATH=$PYTHONPATH:PMoE/scenario_runner
+export COMET_LOGGING_CONSOLE=info
 
 
-export PORT=2000                                                    # change to port that CARLA is running
-export ROUTES=leaderboard/data/routes_training/route_00.xml         # change to desired route
-export TEAM_AGENT=auto_pilot.py                                     # no need to change
-export TEAM_CONFIG=data                                             # change path to save data
+# export PORT=2000                                                    # change to port that CARLA is running
+# export ROUTES=leaderboard/data/routes_training/route_00.xml         # change to desired route
+# export TEAM_AGENT=auto_pilot.py                                     # no need to change
+# export TEAM_CONFIG=data                                             # change path to save data
 
 
-if [ -d "$TEAM_CONFIG" ]; then
-        CHECKPOINT_ENDPOINT="$TEAM_CONFIG/$(basename $ROUTES .xml).txt"
-    else
-            CHECKPOINT_ENDPOINT="$(dirname $TEAM_CONFIG)/$(basename $ROUTES .xml).txt"
-fi
+# if [ -d "$TEAM_CONFIG" ]; then
+#         CHECKPOINT_ENDPOINT="$TEAM_CONFIG/$(basename $ROUTES .xml).txt"
+#     else
+#             CHECKPOINT_ENDPOINT="$(dirname $TEAM_CONFIG)/$(basename $ROUTES .xml).txt"
+# fi
 
 Help()
 {
@@ -28,14 +29,14 @@ Help()
    echo "Facilitates running different stages of training and evaluation (Carla root should be defined at the beginning of this file)."
    echo 
    echo "options:"
-   echo "stage0         Starts training for stage 0, trains U-Net to predict image segmentation maps."
-   echo "stage1         Starts training for stage 1, trains U-Net to predict future segmentation maps."
-   echo "stage2         Starts training for stage 2, trains different models to output control commands."
-   echo "stage3         Starts training for stage 3, refine models on driving task itself. This stage requires Carla."
-   echo "benchmark      Benchmark agent against CORL 2017 benchmarks"
-   echo "nocrash        Benchmark agent against NoCrash benchmark."
-   echo "view_benchmark Print benchmark results."   
-   echo "leaderboard    Benchmark agent against Carla leaderboard."
+   echo "stage0                      Starts training for stage 0, trains U-Net to predict image segmentation maps."
+   echo "stage1                      Starts training for stage 1, trains U-Net to predict future segmentation maps."
+   echo "stage2 conf_dir             Starts training for stage 2, trains different models to output control commands."
+   echo "stage3                      Starts training for stage 3, refine models on driving task itself. This stage requires Carla."
+   echo "benchmark                   Benchmark agent against CORL 2017 benchmarks"
+   echo "nocrash town weather        Benchmark agent against NoCrash benchmark. Where town is {Town01, Town02}, weather {test, train}"
+   echo "view_benchmark              Print benchmark results."   
+   echo "leaderboard                 Benchmark agent against Carla leaderboard."
    echo
 }
 
@@ -57,20 +58,20 @@ run () {
       python PMoE/eval/evaluate.py
       ;;
     nocrash)
-      python PMoE/eval/evaluate_nocrash.py
+      python PMoE/eval/evaluate_nocrash.py --town $2 --weather $3
       ;;
     view_benchmark)
       python PMoE/eval/view_benchmark_results.py
       ;;
     leaderboard)
-      python3 leaderboard/leaderboard/leaderboard_evaluator.py \
-              --track=SENSORS \
-              --scenarios=leaderboard/data/all_towns_traffic_scenarios_public.json  \
-              --agent=${TEAM_AGENT} \
-              --agent-config=${TEAM_CONFIG} \
-              --routes=${ROUTES} \
-              --checkpoint=${CHECKPOINT_ENDPOINT} \
-              --port=${PORT}
+      python3 leaderboard/leaderboard/leaderboard_evaluator.py #\
+              # --track=SENSORS \
+              # --scenarios=leaderboard/data/all_towns_traffic_scenarios_public.json  \
+              # --agent=${TEAM_AGENT} \
+              # --agent-config=${TEAM_CONFIG} \
+              # --routes=${ROUTES} \
+              # --checkpoint=${CHECKPOINT_ENDPOINT} \
+              # --port=${PORT}
       ;;
     -h) # display Help
       Help
@@ -84,6 +85,6 @@ run () {
   esac
 }
 
-run $1 $2
+run $1 $2 $3
 
 echo "Done."
