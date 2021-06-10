@@ -281,7 +281,7 @@ class PUNetExpert(nn.Module):
         self.speed_encoder = make_mlp(**params.speed_encoder)
         self.command_encoder = make_mlp(**params.command_encoder)
         self.punet = PredictiveUnet(**params.punet)
-        punet_weights = torch.load(params.punet_path)
+        punet_weights = torch.load(params.punet_path, map_location=params.device)
         self.punet.load_state_dict(punet_weights["model"])
         self.punet = freeze(self.punet)
         # use backbone if PU-Net does not return a vector as the result

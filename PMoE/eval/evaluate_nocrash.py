@@ -50,6 +50,7 @@ if __name__ == '__main__':
                         help='Number of repetitions per route.')
     parser.add_argument("--track", type=str, default='SENSORS', help="Participation track: SENSORS, MAP")
     parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--no_render_mode', action='store_true')
     parser.add_argument("--checkpoint", type=str,
                         default='./simulation_results.json',
                         help="Path to checkpoint used for saving statistics and resuming")

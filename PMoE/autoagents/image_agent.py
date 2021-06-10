@@ -67,7 +67,7 @@ class ImageAgent(AutonomousAgent):
             self.model = self.model.to(device=self.config.model.actor.device)
         else:
             self.model = get_model(self.config.model.actor)
-            state_dict = torch.load(self.config.model.actor.model_dir)
+            state_dict = torch.load(self.config.model.actor.model_dir, map_location=self.device)
             self.model.load_state_dict(state_dict["model"])
             self.model.choose_action = self.model.sample
             self.model = self.model.to(device=self.device)
@@ -83,8 +83,8 @@ class ImageAgent(AutonomousAgent):
         # create a transform to crop the sky and resize images
         self.transform = transforms.Compose(
             [
-                # Crop([125, 90]),
-                Image.fromarray,
+                Crop([125, 90]),
+                # Image.fromarray,
                 transforms.Resize((224, 224)),
                 transforms.ToTensor(),
             ]
@@ -166,6 +166,7 @@ class ImageAgent(AutonomousAgent):
 
         return control
 
+    @torch.no_grad()
     def run_step(self, input_data, timestamp):
         
         # _, wide_rgb = input_data.get(f'Wide_RGB')
@@ -175,7 +176,7 @@ class ImageAgent(AutonomousAgent):
         # _wide_rgb = wide_rgb[self.wide_crop_top:,:,:3]
         rgb = _rgb[...,:3].copy()
         rgb = rgb[..., ::-1] # BGR -> RGB
-        self.logger.log_image(rgb, f"before_{self.num_frames:05}")
+        # self.logger.log_image(rgb, f"before_{self.num_frames:05}")
 
 
         # _wide_rgb = _wide_rgb[...,::-1].copy()
@@ -201,7 +202,7 @@ class ImageAgent(AutonomousAgent):
         cmd_value = 3 if cmd_value < 0 else cmd_value
         print(f"{spd = }, {cmd_value = }")
         speed = torch.tensor(
-            [spd, ], dtype=torch.float
+            [spd / 10.0, ], dtype=torch.float
         ).unsqueeze_(0).to(self.device)
         # )
         # _cmd = int(observations["command"])
@@ -210,19 +211,19 @@ class ImageAgent(AutonomousAgent):
         ).unsqueeze_(0).to(self.device)
         # )
         images = torch.stack(list(self.img_list), dim=0).unsqueeze_(0).to(self.device)
-        action = self.model.choose_action(images, speed, command).squeeze()
+        action = self.model.choose_action(images, speed, command).squeeze().cpu()
         control = self.postprocess(action)
-        print(f"{control}")
+        # print(f"{control}")
         measurements = {
             "control": [action[0], action[1]],
             "speed": speed,
             "command": command,
         }
-        control = carla.VehicleControl(steer=0, brake=0, throttle=1.0)
+        # # control = carla.VehicleControl(steer=0, brake=0, throttle=1.0)
         log_image = draw_on_image(
             rgb.cpu(), measurements, action.cpu(), False
         )
-        self.logger.log_image(log_image, f"after_{self.num_frames:05}")
+        # self.logger.log_image(log_image, f"after_{self.num_frames:05}")
         self.vizs.append(log_image)
 
         if len(self.vizs) > 1000:
@@ -236,7 +237,7 @@ class ImageAgent(AutonomousAgent):
         # control.steer = 0.0
         # control.brake = 0.0
         # control.throttle = 1.0
-        print(f"{control}")
+        # print(f"{control}")
 
         return control
 

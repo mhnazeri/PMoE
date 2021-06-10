@@ -1,21 +1,23 @@
 import sys
+from pathlib import Path
 try:
     sys.path.append(str(Path("../").resolve()))
 except:
     raise RuntimeError("Can't append root directory of the project the path")
 
+import comet_ml
 from runners import ChallengeRunner
 from utils.utility import get_conf
 
 
 def main(args):
-    scenario = 'assets/all_towns_traffic_scenarios.json'
-    # scenario = 'assets/no_scenarios.json'
-    # route = 'assets/routes_dev.xml'
-    route = 'assets/routes_training/route_10.xml'
+    scenario = 'PMoE/assets/all_towns_traffic_scenarios.json'
+    # scenario = 'PMoE/assets/no_scenarios.json'
+    # route = 'PMoE/assets/routes_dev.xml'
+    route = 'PMoE/assets/routes_training/route_10.xml'
 
-    args.agent = 'autoagents/image_agent'
-    # args.agent = 'autoagents/collector_agents/lidar_q_collector'
+    args.agent = 'PMoE/autoagents/image_agent'
+    # args.agent = 'PMoE/autoagents/collector_agents/lidar_q_collector'
     args.agent_config = args.agent_config#'config.yaml'
     # args.agent_config = 'config_lidar.yaml'
 
@@ -49,7 +51,7 @@ if __name__ == '__main__':
     parser.add_argument("--track", type=str, default='SENSORS', help="Participation track: SENSORS, MAP")
     parser.add_argument('--resume', type=bool, default=False, help='Resume execution from last checkpoint?')
     parser.add_argument("--checkpoint", type=str,
-                        default='./simulation_results.json',
+                        default='PMoE/benchmark_results/simulation_results.json',
                         help="Path to checkpoint used for saving statistics and resuming")
 
     args = parser.parse_args()

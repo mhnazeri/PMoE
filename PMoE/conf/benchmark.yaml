@@ -20,11 +20,11 @@ env:
   # n_commands: 6
 
 sensors:
-  camera_x: 1.5
-  camera_z: 2.4
+  camera_x: 1.3
+  camera_z: 1.3
   img_width: 800
   img_height: 600
-  fov: 50
+  fov: 100
 
 
 # Logger parameters
@@ -39,18 +39,17 @@ logger:
 
 # model parameters
 model:
-  # type: 'moe' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained, rl_agent
   actor:
     n_commands: 6
-    device: "cpu" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
-    model_dir: "PMoE/checkpoint/MoE-best.pth" # pretrained model directory, it cannot be None
-    exclude_freeze: ['something',] # a list of layers to stay unfrozen
+    device: "cuda:0" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
+    model_dir: "PMoE/checkpoint/PUNet_Action_Inter-best.pth" # pretrained model directory, it cannot be None
+    exclude_freeze: [] # a list of layers to stay unfrozen
     # lr: 0.00001 # learning rate
     n_experts: 3 # number of experts to be used
     # exclude_freeze: [ 'model_weights', 'alpha' ] # a list of layers to stay unfrozen
-    type: 'moe' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained
-    # model_dir: "../checkpoint/moe-e4-best.pth" # pretrained model directory, it cannot be None
-    verbose: True # show some statistics about model parameters or notn_experts: 3 # number of experts to be used
+    type: 'punet_inter' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained
+    punet_path: "PMoE/checkpoint/punet-e80.pth" # pretrained model directory, it cannot be None
+    verbose: False # show some statistics about model parameters or notn_experts: 3 # number of experts to be used
     action_head: # speed encoder network, just an MLP
       dims: [ 1536, 512, 512 ] # MLP dimensions. First dim should always be 1536
       act: 'elu' # type of activation function. Valid values: [relu, tanh, sigmoid, elu]
@@ -80,7 +79,7 @@ model:
       n_frames: 4 # number of input frames
       rgb: # configs for resnet and mobilenet models
         arch: 'resnet18' # valid values: resnet18/34/50, mobilenet_v2/3_small/large
-        pretrained: False
+        pretrained: True
         gamma: 2 # ECA gamma parameter
         b: 1 # ECA b parameter
       segmentation:
@@ -90,18 +89,18 @@ model:
         model_dir: "PMoE/checkpoint/unet-best.pth"
     punet:
       past_frames: 4 # please note that data is captured at 2hz
-      future_frames: 4
+      future_frames: 6
       in_features: 3
       num_classes: 23 # number of segmentation classes, for carla 0.9.6+ it is 23
       gamma: 2 # gamma parameter of eca module
       b: 1 # b parameter of eca module
       #inter_repr: False # whether PU-Net returns intermediate representation or not (not intended for training)
       unet_inter_repr: False # whether U-Net returns intermediate representation or not (set to True if future_frames is 0)
-      model_name: "unet-swa"
+      model_name: "unet"
       model_path: "PMoE/checkpoint/unet-best.pth"
     pmoe:
       moe_dir: "PMoE/checkpoint/MoE-e50.pth" # MoE pretrained model directory, it cannot be None
-      punet_dir: "" # PU-Net pretrained model with actions directory
+      punet_dir: "PMoE/checkpoint/PUNet_Action_Inter-e50.pth" # PU-Net pretrained model with actions directory
   critic:
     lr: 0.001
     backbone: # visual feature extractor
