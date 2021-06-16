@@ -346,9 +346,10 @@ class PMoE(nn.Module):
         self.punet = PUNetExpert(params)
         if punet_model_dir:
             self.punet.load_state_dict(torch.load(punet_model_dir), strict=False)
+            self.punet = freeze(self.punet, params.exclude_freeze, params.verbose)
 
-        self.punet = freeze(self.punet, params.exclude_freeze, params.verbose)
-        self.model_weights = nn.Linear(4, 2)
+        self.lat_weights = nn.Linear(2, 1)
+        self.long_weights = nn.Linear(2, 1)
 
     def forward(
         self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor
@@ -356,9 +357,15 @@ class PMoE(nn.Module):
         punet_actions, _ = self.punet(images, speed, command)
         dists, _ = self.moe(images, speed, command)
         moe_actions = dists.sample()
-        actions = torch.cat([moe_actions, punet_actions], dim=-1)
+        # print(f"{type(punet_actions) = }")
+        # print(f"{type(moe_actions) = }")
+        # print(f"{punet_actions.shape = }")
+        # print(f"{moe_actions.shape = }")
+        # actions = torch.cat([moe_actions, punet_actions], dim=-1)
+        lat_actions = self.lat_weights(torch.cat([moe_actions[:, 0: 1], punet_actions[:, 0: 1]], dim=-1))
+        long_actions = self.long_weights(torch.cat([moe_actions[:, 1:], punet_actions[:, 1:]], dim=-1))
         # -1 is just a dummy variable as speed prediction for the sake of interface consistency
-        return torch.tanh(self.model_weights(actions)), -1
+        return torch.tanh(torch.cat([lat_actions, long_actions], dim=-1)), -1
 
     def sample(
         self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor

@@ -42,12 +42,12 @@ model:
   actor:
     n_commands: 6
     device: "cuda:0" # device name, values: "cpu" or "cuda:x" where 'x' is gpu index
-    model_dir: "PMoE/checkpoint/PUNet_Action_Inter-best.pth" # pretrained model directory, it cannot be None
+    model_dir: "PMoE/checkpoint/PMoE-e5.pth" # pretrained model directory, it cannot be None
     exclude_freeze: [] # a list of layers to stay unfrozen
     # lr: 0.00001 # learning rate
     n_experts: 3 # number of experts to be used
     # exclude_freeze: [ 'model_weights', 'alpha' ] # a list of layers to stay unfrozen
-    type: 'punet_inter' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained
+    type: 'pmoe+pretrained' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained
     punet_path: "PMoE/checkpoint/punet-e80.pth" # pretrained model directory, it cannot be None
     verbose: False # show some statistics about model parameters or notn_experts: 3 # number of experts to be used
     action_head: # speed encoder network, just an MLP

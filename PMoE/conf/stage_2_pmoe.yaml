@@ -24,7 +24,7 @@ logger:
 # Dataloader parameters
 dataloader:
   num_workers: 8
-  batch_size: 128
+  batch_size: 32
   shuffle: True # whether to shuffle data or not
   pin_memory: True # directly load datasets as CUDA tensors
 
@@ -78,7 +78,7 @@ model:
   type: 'pmoe+pretrained' # network type. Valid values are: punet, punet_inter, moe, moe_alt, moe_shared, pmoe, pmoe+pretrained
   n_experts: 3 # number of experts to be used
   loss_coefs: [ 0.7, 0.3 ] # Coefficients for loss function. [BC_NLL, Speed_Loss]
-  exclude_freeze: [ ] # a list of layers to stay unfrozen
+  exclude_freeze: ['lat_weights', 'long_weights' ] # a list of layers to stay unfrozen
   punet_path: "PMoE/checkpoint/punet-e80.pth"
   action_head: # speed encoder network, just an MLP
     dims: [ 1536, 512, 512 ] # MLP dimensions. First dim should always be 1536
