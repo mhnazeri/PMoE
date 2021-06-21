@@ -3,6 +3,19 @@
 # Planning Mixture of Experts
 This repository contains PyTorch implementation of Planning Mixture of Experts (PMoE).
 
+## Dependencies
+This repo uses PyTorch and CARLA simulator (0.9.10.1). Please make sure that all dependencies are installed by running:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+Please specify the CARLA root directory at the top of `run.sh` file.
+```bash
+export CARLA_ROOT=~/Projects/nazeri/CARLA_0.9.10.1          # change to where you installed CARLA
+```
+You need at least a middle range GPU to run the experiments with minimum possible batch size.
+
 ## Training
 To run different training stages, please see [experiments doc](docs/experiments.md) first. You can define the 
 training and model parameters via the respective config file 
