@@ -78,10 +78,9 @@ def l1_gdl(inputs: torch.Tensor, targets: torch.Tensor):
         )
     ).sum(dim=(-2, -1)).mean()
 
-    # gdl_sum /= inputs.shape[0]  # divide by batch_size
     l1_sum = l1_loss(inputs[:, -1, ...], target_oh[:, -1, ...])
 
-    return (l1_sum + gdl_sum) # / inputs.shape[1]  # average between frames
+    return l1_sum + gdl_sum
 
 
 class AutoregressiveCriterion(nn.Module):
@@ -125,8 +124,6 @@ def moe_loss(action_dists, speed_pred, actions_gt, speed_gt, loss_coefs):
     nll = -torch.mean(loglike, dim=0)
     mse_fn = nn.MSELoss()
     if len(speed_pred.shape) > 2:
-        # speed_loss = 0
-        # for i in range(speed_pred.shape[1]):
         speed_loss = mse_fn(speed_pred, speed_gt.unsqueeze_(1).expand_as(speed_pred))
         speed_loss /= speed_pred.shape[1]
     else:
@@ -155,13 +152,4 @@ def pmoe_loss(actions, speed_pred, actions_gt, speed_gt, loss_coefs):
 
 
 if __name__ == "__main__":
-    x = torch.rand(2, 4, 23, 144, 256, requires_grad=True)
-    y = torch.rand(2, 4, 144, 256).long()
-    y[0, 0, 2, 2] = 21
-    l1_gdl(x, y).backward()
-    print(x.grad)
-    print(l1_gdl(x, y))
-    # x = torch.rand(2, 23, 5, 7, requires_grad=True)
-    # y = torch.rand(2, 5, 7).long()
-    # y[0, 2, 2] = 4
-    # print(tversky_loss(x, y) == tversky_loss_v2(x, y))
+    pass

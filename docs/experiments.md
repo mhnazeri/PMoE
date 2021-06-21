@@ -94,7 +94,7 @@ model:
       model_dir: "../checkpoint/unet-e3-swa.pth"
 ```
 
-### Experiment
+### Experiment 2: PMoE
 To train PMoE model, there is two possibility. Either you can train PMoE with PU-Net pretrained on action
 prediction or not. To do so, change the model type to 'pmoe+pretrained' to use pretrained PU-Net and also you should
 provide the PU-Net model directory in `model.pmoe.punet_dir`. Using `pmoe` alone as `model.type` will not use

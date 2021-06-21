@@ -72,8 +72,7 @@ class BaseExpert(nn.Module):
         self.action_pred = nn.Linear(action_layer_out_features, 4)
 
     def forward(
-        self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor
-    ) -> torch.Tensor:
+        self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor):
         """Forward pass of expert model.
 
         Args:
@@ -99,10 +98,6 @@ class BaseExpert(nn.Module):
         mean, std = self.action_pred(action_features).split(2, dim=-1)
         std = F.elu(std) + 1
         alpha = torch.relu(self.alpha(action_features))
-        # print(f"{mean = }")
-        # print(f"{std = }")
-        # actions = Normal(mean, torch.exp(std))
-        # actions = Normal(torch.zeros_like(mean), torch.ones_like(std))
         return alpha, mean, std, pred_speed
 
 
@@ -116,8 +111,7 @@ class BaseExpertAlt(BaseExpert):
         )
 
     def forward(
-        self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor
-    ) -> torch.Tensor:
+        self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor):
         speed = self.speed_encoder(speed)
         command = self.command_encoder(command)
         images = images.view(
@@ -352,16 +346,10 @@ class PMoE(nn.Module):
         self.long_weights = nn.Linear(2, 1)
 
     def forward(
-        self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor
-    ) -> torch.Tensor:
+        self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor):
         punet_actions, _ = self.punet(images, speed, command)
         dists, _ = self.moe(images, speed, command)
         moe_actions = dists.sample()
-        # print(f"{type(punet_actions) = }")
-        # print(f"{type(moe_actions) = }")
-        # print(f"{punet_actions.shape = }")
-        # print(f"{moe_actions.shape = }")
-        # actions = torch.cat([moe_actions, punet_actions], dim=-1)
         lat_actions = self.lat_weights(torch.cat([moe_actions[:, 0: 1], punet_actions[:, 0: 1]], dim=-1))
         long_actions = self.long_weights(torch.cat([moe_actions[:, 1:], punet_actions[:, 1:]], dim=-1))
         # -1 is just a dummy variable as speed prediction for the sake of interface consistency
@@ -376,78 +364,4 @@ class PMoE(nn.Module):
 
 
 if __name__ == "__main__":
-    from omegaconf import OmegaConf
-
-    def get_conf(name: str):
-        cfg = OmegaConf.load(f"{name}.yaml")
-        return cfg
-
-    imgs = torch.randn(2, 4, 3, 144, 256)
-    speed = torch.randn(2, 1)
-    command = torch.randn(2, 4)
-    cfg = get_conf("../conf/stage_2")
-    # model = MixtureOfExperts(cfg.model)
-    # print(model)
-    # alpha, actions, speed = model(imgs, speed, command)
-    # print(speed[:, 3])
-    # print(actions[3].rsample())
-    # for i, expert in enumerate(out):
-    #     print(f"expert {i} decisions:")
-    #     print(f"alpha = {expert[0]}")
-    #     print(f"actions = {expert[1]}")
-    #     print(f"speed = {expert[2]}")
-    #     print("-" * 50)
-    model = get_model(cfg.model)
-    # model = freeze(model, cfg.model.exclude_freeze, cfg.model.verbose)
-    dists, speed_pred = model(imgs, speed, command)
-    print(f"{dists}")
-
-    def moe_loss(action_dists, speed_pred, actions_gt, speed_gt, loss_coefs):
-        loglike = action_dists.log_prob(actions_gt)
-        # print(alphas)
-        # print(action_dists[0].sample().shape)
-        # print(actions_gt.shape)
-        # print(action_dists[0].mean)
-        # print(action_dists[0].loc)
-        # print(action_dists[0].log_prob(actions_gt))
-        # print(loglike.shape, alphas.shape)
-        # loglike = torch.sum(loglike, dim=2)
-        nll = -torch.mean(loglike, dim=0)
-        print(f"{nll = }")
-        mse_fn = nn.MSELoss()
-        if len(speed_pred.shape) > 2:
-            # speed_loss = 0
-            # for i in range(speed_pred.shape[1]):
-            # print(f"{speed_pred[:, i, :].shape = }")
-            speed_loss = mse_fn(
-                speed_pred, speed_gt.unsqueeze_(1).expand_as(speed_pred)
-            )
-        else:
-            speed_loss = mse_fn(speed_pred, speed_gt)
-        print(f"{speed_loss = }")
-        return loss_coefs[0] * nll + loss_coefs[1] * (speed_loss / speed_pred.shape[1])
-
-    def punet_loss(actions, speed_pred, actions_gt, speed_gt, loss_coefs):
-        """Use L1 loss for imitation loss and L2 loss for speed prediction"""
-        l1_loss = nn.L1Loss()
-        mse_loss = nn.MSELoss()
-        imitation_loss = l1_loss(actions, actions_gt)
-        speed_loss = mse_loss(speed_pred, speed_gt)
-
-        return loss_coefs[0] * imitation_loss + loss_coefs[1] * speed_loss
-
-    # print(f"{speed_pred.shape = }")
-    speeds = torch.randn(2, 1)
-    # print(f"{speeds.shape = }")
-    print(
-        moe_loss(
-            dists,
-            speed_pred,
-            torch.tensor([[0.0, 0.5], [0.4, -0.25]]),
-            speeds,
-            [0.7, 0.3],
-        )
-    )
-    # print(f"{dists.sample() = }")
-    # print(f"{dists.mixture_distribution = }")
-    # print(f"{dists.component_distribution = }")
+    pass

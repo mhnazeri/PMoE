@@ -5,9 +5,7 @@ try:
 except:
     raise RuntimeError("Can't append root directory of the project the path")
 
-import comet_ml
 from runners import ChallengeRunner
-from utils.utility import get_conf
 
 
 def main(args):
@@ -17,9 +15,7 @@ def main(args):
     route = 'PMoE/assets/routes_training/route_10.xml'
 
     args.agent = 'PMoE/autoagents/image_agent'
-    # args.agent = 'PMoE/autoagents/collector_agents/lidar_q_collector'
-    args.agent_config = args.agent_config#'config.yaml'
-    # args.agent_config = 'config_lidar.yaml'
+    args.agent_config = args.agent_config
 
     port = args.port
     tm_port = port + 2
@@ -55,5 +51,4 @@ if __name__ == '__main__':
                         help="Path to checkpoint used for saving statistics and resuming")
 
     args = parser.parse_args()
-    # conf = get_conf("PMoE/conf/benchmark")
     main(args)

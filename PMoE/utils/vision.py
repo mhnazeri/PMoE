@@ -153,14 +153,4 @@ def draw_on_image(img, measurements, action, gt = True):
 
 
 if __name__ == "__main__":
-    img = Image.open("../data/route_00_03_18_15_40_26/rgb/0000.png")
-    img = torch.tensor(np.array(img)).permute(2, 0, 1)[:, :224, :224]
-    measurements = {
-        "control": torch.tensor([-0.5, -0.3]),
-        "speed": torch.tensor(0.9),
-        "command": torch.tensor([0, 0, 0, 1]),
-    }
-    action = torch.tensor([0.9, -0.3])
-    img = draw_on_image(img, measurements, action)
-    plt.imshow(img)
-    plt.show()
+    pass

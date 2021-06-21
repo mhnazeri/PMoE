@@ -5,22 +5,8 @@ export PYTHONPATH=$PYTHONPATH:$CARLA_ROOT/PythonAPI/carla/dist/carla-0.9.10-py3.
 export PYTHONPATH=$PYTHONPATH:$CARLA_ROOT/PythonAPI/carla/agents
 export PYTHONPATH=$PYTHONPATH:PMoE
 export PYTHONPATH=$PYTHONPATH:PMoE/leaderboard
-#export PYTHONPATH=$PYTHONPATH:leaderboard/team_code
 export PYTHONPATH=$PYTHONPATH:PMoE/scenario_runner
 export COMET_LOGGING_CONSOLE=info
-
-
-# export PORT=2000                                                    # change to port that CARLA is running
-# export ROUTES=leaderboard/data/routes_training/route_00.xml         # change to desired route
-# export TEAM_AGENT=auto_pilot.py                                     # no need to change
-# export TEAM_CONFIG=data                                             # change path to save data
-
-
-# if [ -d "$TEAM_CONFIG" ]; then
-#         CHECKPOINT_ENDPOINT="$TEAM_CONFIG/$(basename $ROUTES .xml).txt"
-#     else
-#             CHECKPOINT_ENDPOINT="$(dirname $TEAM_CONFIG)/$(basename $ROUTES .xml).txt"
-# fi
 
 Help()
 {
@@ -63,16 +49,9 @@ run () {
     view_benchmark)
       python PMoE/eval/view_benchmark_results.py
       ;;
-    leaderboard)
-      python3 leaderboard/leaderboard/leaderboard_evaluator.py #\
-              # --track=SENSORS \
-              # --scenarios=leaderboard/data/all_towns_traffic_scenarios_public.json  \
-              # --agent=${TEAM_AGENT} \
-              # --agent-config=${TEAM_CONFIG} \
-              # --routes=${ROUTES} \
-              # --checkpoint=${CHECKPOINT_ENDPOINT} \
-              # --port=${PORT}
-      ;;
+#    leaderboard)
+#      python3 leaderboard/leaderboard/leaderboard_evaluator.py
+#      ;;
     -h) # display Help
       Help
       exit

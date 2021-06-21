@@ -121,34 +121,4 @@ class PredictiveUnet(nn.Module):
 
 
 if __name__ == "__main__":
-    net = PredictiveUnet(
-        inter_repr=True,
-        model_name="unet-swa",
-        model_path="../checkpoint/unet-e1-swa-best.pth",
-        future_frames=6,
-        past_frames=4,
-    )
-    # x = torch.rand(size=(1, 3, 144, 256), dtype=torch.float32)
-    x = [torch.rand(size=(3, 144, 256), dtype=torch.float32) for _ in range(4)]
-    x = torch.stack(x, dim=0).unsqueeze(0)
-    y = [torch.rand(size=(3, 144, 256), dtype=torch.float32) for _ in range(4)]
-    y = torch.stack(y, dim=0).unsqueeze(0)
-    x = torch.cat([x, y], dim=0)
-    print(x.shape)
-    net.eval()
-    DEBUG = 0
-    if DEBUG:
-        from thop import profile, clever_format
-
-        def op_counter(model, sample):
-            model.eval()
-            macs, params = profile(model, inputs=(sample,))
-            macs, params = clever_format([macs, params], "%.3f")
-            return macs, params
-
-        macs, params = op_counter(net, x)
-        print(macs, params)
-
-    # print(net)
-    print(net(x).shape)
-    # print(net.modules()[:5])
+    pass

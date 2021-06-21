@@ -55,9 +55,7 @@ class CarlaSeg(Dataset):
         crop: Union[List, Tuple] = (125, 90),
         resize: Union[List, Tuple] = (224, 224),
     ):
-        # assert (
-        #     1 > val_percent > 0
-        # ), "validation percentage should be a value between (0 , 1)."
+
         random.seed(seed)
         torch.random.manual_seed(seed)
         # read directories
@@ -151,9 +149,7 @@ class CarlaSegPred(Dataset):
         speed_factor: int = 10,
         n_commands: int = 4,
     ):
-        # assert (
-        #     1 > val_percent > 0
-        # ), "validation percentage should be a value between (0 , 1)."
+
         random.seed(seed)
         torch.random.manual_seed(seed)
         self.load_measurements = load_measurements
@@ -200,7 +196,6 @@ class CarlaSegPred(Dataset):
                     self.mask_address.append(mask_files[i + past_frames : i + seq_len])
 
         n_samples = len(self.img_address)
-        # val_samples = int(val_percent * n_samples)
         shuffled_data = torch.randperm(n_samples)
         self.batch_read_number = 0
 
@@ -313,136 +308,5 @@ class CarlaSegPred(Dataset):
             return torch.stack(imgs, dim=0), torch.stack(masks, dim=0)
 
 
-def decode_mask(mask, nc: int = 23):
-    """Decode segmentation map to an RGB image
-
-    class labels are based on:
-        https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera
-
-    Args:
-        mask: (numpy.ndarray) the segmentation image
-        nc: (int) number of classes that segmentation have
-    """
-    if len(mask.shape) == 3:
-        mask = np.argmax(mask, axis=0)
-
-    label_colors = np.array(
-        [
-            (0, 0, 0),  # 0=Unlabeled
-            # 1=Building, 2=Fence, 3=Other   , 4=Pedestrian, 5=Pole
-            (70, 70, 70),
-            (100, 40, 40),
-            (55, 90, 80),
-            (220, 20, 60),
-            (153, 153, 153),
-            # 6=RoadLine, 7=Road, 8=SideWalk, 9=Vegetation, 10=Vehicles
-            (157, 234, 50),
-            (128, 64, 128),
-            (244, 35, 232),
-            (107, 142, 35),
-            (0, 0, 142),
-            # 11=Wall, 12=TrafficSign, 13=Sky, 14=Ground, 15=Bridge
-            (102, 102, 156),
-            (220, 220, 0),
-            (70, 130, 180),
-            (81, 0, 81),
-            (150, 100, 100),
-            # 16=RailTrack, 17=GuardRail, 18=TrafficLight, 19=Static, 20=Dynamic
-            (230, 150, 140),
-            (180, 165, 180),
-            (250, 170, 30),
-            (110, 190, 160),
-            (170, 120, 50),
-            # 21=water, 22=terrain
-            (45, 60, 150),
-            (145, 170, 100),
-        ]
-    )
-
-    r = np.zeros_like(mask).astype(np.uint8)
-    g = np.zeros_like(mask).astype(np.uint8)
-    b = np.zeros_like(mask).astype(np.uint8)
-
-    for l in range(nc):
-        idx = mask == l
-        r[idx] = label_colors[l, 0]
-        g[idx] = label_colors[l, 1]
-        b[idx] = label_colors[l, 2]
-
-    rgb = np.stack([r, g, b], axis=2)
-    return rgb
-
-
 if __name__ == "__main__":
-    # data = CarlaSeg(mode='train')
-    # print(len(data))
-    # d = data[0]
-    # mask = d[1]
-    # img = d[0]
-    # seg_decoded = decode_mask(mask)
-    # print(img.shape, img.dtype, mask.shape, mask.dtype)
-    # print(f"\n{mask = }\n\n\n\n {seg_decoded = }")
-    # # plotting
-    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 15))
-    # ax1.set_axis_off()
-    # ax2.set_axis_off()
-    #
-    # ax1.set_title("Image")
-    # ax2.set_title("Mask")
-    # # print(f"{img_a.shape = } | {seg_a.shape = }")
-    # ax1.imshow(img.permute(1, 2, 0))
-    # ax2.imshow(seg_decoded)
-    # plt.show()
-    # plot CarlaSegPred
-    # data = CarlaSegPred(mode='train', past_frames=2, future_frames=6)
-    # print(len(data))
-    # d = data[41]
-    # seg_decoded = decode_mask(d[1][0])
-    # print(len(d[0]), d[0].shape, len(d[1]), d[1].shape)
-    # print(f"\n{d[1][0] = }\n\n\n\n {seg_decoded = }")
-    # # plotting
-    # fig, ((ax1, ax2, ax3, ax4), (ax5, ax6, ax7, ax8)) = plt.subplots(2, 4, figsize=(20, 20))
-    # ax1.set_axis_off()
-    # ax2.set_axis_off()
-    # ax3.set_axis_off()
-    # ax4.set_axis_off()
-    # ax5.set_axis_off()
-    # ax6.set_axis_off()
-    # ax7.set_axis_off()
-    # ax8.set_axis_off()
-    #
-    # ax1.imshow(d[0][0].permute(1, 2, 0))
-    # ax2.imshow(d[0][1].permute(1, 2, 0))
-    # ax3.imshow(decode_mask(d[1][0]))
-    # ax4.imshow(decode_mask(d[1][1]))
-    # ax5.imshow(decode_mask(d[1][2]))
-    # ax6.imshow(decode_mask(d[1][3]))
-    # ax7.imshow(decode_mask(d[1][4]))
-    # ax8.imshow(decode_mask(d[1][5]))
-    # plt.show()
-
-    # plot CarlaSegPred measurements
-    data = CarlaSegPred(
-        load_measurements=True, mode="train", past_frames=4, future_frames=6
-    )
-    print(len(data))
-    d = data[10]
-    print(len(d[0]), d[0][0].dtype, type(d[1]))
-    print(f"{d[0][0].shape = }, {d[0][-1].min() = }, {d[0][-1].max() = }")
-    measurements = d[1]
-    print(
-        f"{measurements['control'] = }\t{measurements['speed'] = }\t{measurements['target_speed'] = }\t"
-        f"{measurements['command'] = }"
-    )
-    # plotting
-    # fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(20, 20))
-    # ax1.set_axis_off()
-    # ax2.set_axis_off()
-    # ax3.set_axis_off()
-    # ax4.set_axis_off()
-    #
-    # ax1.imshow(d[0][0].permute(1, 2, 0))
-    # ax2.imshow(d[0][1].permute(1, 2, 0))
-    # ax3.imshow(d[0][2].permute(1, 2, 0))
-    # ax4.imshow(d[0][3].permute(1, 2, 0))
-    # plt.show()
+   pass

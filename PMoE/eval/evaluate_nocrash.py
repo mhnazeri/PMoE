@@ -6,7 +6,6 @@ except:
     raise RuntimeError("Can't append root directory of the project to the path")
 
 from runners import NoCrashEvalRunner
-# from utils.utility import get_conf
 
 
 def main(args):
@@ -18,7 +17,6 @@ def main(args):
     tm_port = port + 2
     runner = NoCrashEvalRunner(args, town, weather, port=port, tm_port=tm_port)
     runner.run()
-
 
 
 if __name__ == '__main__':
@@ -59,5 +57,4 @@ if __name__ == '__main__':
                         help="Path to save benchmark results")
 
     args = parser.parse_args()
-    # conf = get_conf("PMoE/conf/benchmark")
     main(args)

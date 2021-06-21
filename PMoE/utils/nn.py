@@ -194,57 +194,6 @@ def init_weights(
         return init
 
 
-# def init_weights_normal(m: nn.Module, mean: float = 0.0, std: float = 0.5):
-#     """Initialize the network's weights based on normal distribution
-
-#     Args:
-#         m: (nn.Module) network itself
-#         mean: (float) mean of normal distribution
-#         std: (float) standard deviation for normal distribution
-#     """
-#     classname = m.__class__.__name__
-#     if classname.find("Conv") != -1:
-#         nn.init.normal_(m.weight.data, mean=mean, std=std)
-#     elif classname.find("BatchNorm") != -1:
-#         nn.init.normal_(m.weight.data, mean=mean, std=std)
-#         nn.init.constant_(m.bias.data, 0)
-#     elif classname.find("Linear") != -1:
-#         nn.init.normal_(m.weight.data, mean=mean, std=std)
-#         nn.init.constant_(m.bias.data, 0)
-
-
-# def init_weights_uniform(m: nn.Module, low: float = 0.0, high: float = 1.0):
-#     """Initialize the network's weights based on uniform distribution
-
-#     Args:
-#         m: (nn.Module) network itself
-#         low: (float) minimum threshold for uniform distribution
-#         high: (float) maximum threshold for uniform distribution
-#     """
-#     classname = m.__class__.__name__
-#     if classname.find("Conv") != -1:
-#         nn.init.uniform_(m.weight.data, a=low, b=high)
-#     elif classname.find("BatchNorm") != -1:
-#         nn.init.uniform_(m.weight.data, a=low, b=high)
-#         nn.init.constant_(m.bias.data, 0)
-#     elif classname.find("Linear") != -1:
-#         nn.init.uniform_(m.weight.data, a=low, b=high)
-#         nn.init.constant_(m.bias.data, 0)
-
-
-# def init_weights_xavier_normal(m: nn.Module):
-#     """Initialize the network's weights based on xaviar normal distribution"""
-#     classname = m.__class__.__name__
-#     if classname.find("Conv") != -1:
-#         nn.init.xavier_normal_(m.weight.data)
-#     elif classname.find("BatchNorm") != -1:
-#         nn.init.xavier_normal_(m.weight.data)
-#         nn.init.constant_(m.bias.data, 0)
-#     elif classname.find("Linear") != -1:
-#         nn.init.xavier_normal_(m.weight.data)
-#         nn.init.constant_(m.bias.data, 0)
-
-
 def op_counter(model, sample):
     model.eval()
     macs, params = profile(model, inputs=(sample,))
