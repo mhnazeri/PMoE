@@ -1,7 +1,24 @@
 [![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
 
+<!-- <div class="imgcap">
+<img src="docs/PMoE_overview.svg" height="300" width="400">
+<div class="thecap">Overview of PMoE architecture.</div>
+</div> -->
+
+
+<p align="center">
+  <img src="docs/PMoE_overview.svg"  height="400" width="600"/>
+</p>
+
+
+<!-- <div class="imgcap">
+<img src="docs/sample_result.png">
+<div class="thecap"  style="text-align:justify;">Sample output of the PMoE. PMoE's predictions are in red whereas the reflective rule-based AI are in green</div>
+</div>
+ -->
+
 # Planning Mixture of Experts
-This repository contains PyTorch implementation of Planning Mixture of Experts (PMoE).
+This repository contains PyTorch implementation of Planning Mixture of Experts (PMoE) for autonomous urban driving in CARLA simulator.
 
 ## Dependencies
 This repo uses PyTorch and CARLA simulator (0.9.10.1). Please make sure that all dependencies are installed by running:
@@ -23,6 +40,14 @@ in `conf` directory, then, use `run.sh stage_number` to run training where `stag
 `stage0`, `stage1`, `stage2`, `stage3`. To see more options, and their description execute `./run.sh -h`
 
 ## Evaluation
+
+<div align="center" style="display:inline-block">
+  <img src="docs/sample_result.png"/><br>
+  Sample output of the PMoE. PMoE's predictions are in red whereas the reflective rule-based AI are in green.
+</div>
+
+<p><br></p>
+
 To evaluate the models there are two options, Carla leaderboard evaluation or nocrash evaluation which can 
 be run via `./run.sh benchmark` or `./run.sh nocrash` respectively. You can configure the model and benchmark 
 parameters through the `conf/benchmark.yaml` config file.
