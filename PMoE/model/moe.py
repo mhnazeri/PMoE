@@ -347,7 +347,7 @@ class PMoE(nn.Module):
 
     def forward(
         self, images: torch.Tensor, speed: torch.Tensor, command: torch.Tensor):
-        punet_actions, _ = self.punet(images, speed, command)
+        punet_actions, _ = self.punet(images.clone(), speed.clone(), command.clone())
         dists, _ = self.moe(images, speed, command)
         moe_actions = dists.sample()
         lat_actions = self.lat_weights(torch.cat([moe_actions[:, 0: 1], punet_actions[:, 0: 1]], dim=-1))
