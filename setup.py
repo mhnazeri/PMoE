@@ -25,7 +25,7 @@ setup(
     zip_safe=False,
 
     install_requires=[
-        'Pillow~=8.0.1',
+        'Pillow~=8.3.2',
         'numpy~=1.19.4',
         'carla~=0.9.6',
         'Pillow~=8.0.1',
