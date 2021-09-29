@@ -28,7 +28,7 @@ setup(
         'Pillow~=8.3.2',
         'numpy~=1.19.4',
         'carla~=0.9.6',
-        'Pillow~=8.0.1',
+        'Pillow>=8.0.1,<8.4.0',
         'tqdm~=4.55.1',
         'opencv-python~=4.4.0.46',
         'torch~=1.8.1',
