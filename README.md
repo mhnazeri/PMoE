@@ -8,7 +8,6 @@ This repository contains PyTorch implementation of Planning Mixture of Experts (
 
 
 
-
 ## Dependencies
 This repo uses PyTorch and CARLA simulator (0.9.10.1). Please make sure that all dependencies are installed by running:
 ```bash
@@ -34,6 +33,22 @@ in `conf` directory, then, use `run.sh stage_number` to run training where `stag
   <img src="docs/sample_result.png"/><br>
   Sample output of the PMoE. PMoE's predictions are in red whereas the reflective rule-based AI are in green.
 </div>
+
+<p><br></p>
+
+<p align="center">
+  <img src="docs/PMoE.gif"/>
+	<p align="center">
+		PMoE
+	</p>
+</p>
+
+<p align="center">
+  <img src="docs/PU-Net.gif"/>
+	<p align="center">
+		PU-Net
+	</p>
+</p>
 
 <p><br></p>
 
