@@ -26,7 +26,7 @@ setup(
 
     install_requires=[
         'Pillow>=8.3.2',
-        'numpy~=1.19.4',
+        'numpy>=1.19.4,<1.22.0',
         'carla~=0.9.6',
         'Pillow>=8.0.1,<9.1.0',
         'tqdm~=4.55.1',
