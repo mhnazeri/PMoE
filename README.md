@@ -1,6 +1,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 # Planning Mixture of Experts
-This repository contains PyTorch implementation of Planning Mixture of Experts (PMoE) for autonomous urban driving in CARLA simulator.
+This repository contains PyTorch implementation of ''Exploring Reflective Limitation of Behavior Cloning in Autonomous Vehicles'' paper.
 
 <p align="center">
   <img src="docs/PMoE_overview.svg"  height="400" width="600"/>
@@ -64,6 +64,20 @@ Thanks for [World on Rails](https://github.com/dotchen/WorldOnRails), [Learning 
 [CARLA leaderboard](https://github.com/carla-simulator/leaderboard.git),
 [CARLA scenario_runner](https://github.com/carla-simulator/scenario_runner.git),
 [Coiltraine](https://github.com/felipecode/coiltraine), repos for making their code public.
+
+## Reference
+If you find this repo to be useful in your research, please consider citing our work
+```
+@INPROCEEDINGS{Nazeri2021,
+  author={Nazeri, Mohammad Hossein and Bohlouli, Mahdi},
+  booktitle={2021 IEEE International Conference on Data Mining (ICDM)}, 
+  title={Exploring Reflective Limitation of Behavior Cloning in Autonomous Vehicles}, 
+  year={2021},
+  volume={},
+  number={},
+  pages={1252-1257},
+  doi={10.1109/ICDM51629.2021.00153}}
+```
 
 ## License
 This repo is released under the MIT License (please refer to the LICENSE file for details). Part of the PythonAPI and the map rendering code is borrowed from the official [CARLA repo](https://github.com/carla-simulator/carla), which is under MIT license. 
